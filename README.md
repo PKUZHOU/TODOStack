@@ -2,6 +2,11 @@
 
 TODOStack 是一个基于栈结构的任务管理应用，它提供了一种独特的方式来组织和管理你的任务。通过栈的后进先出(LIFO)特性，帮助你专注于最新和最重要的任务。
 
+![image](https://github.com/user-attachments/assets/6012dea2-79ab-4f92-ae80-dbfb2e0b300c)
+
+![image](https://github.com/user-attachments/assets/c139ead7-8f2e-4c80-92c7-636de5baa2ca)
+
+
 ## 特性
 
 ### 核心功能
@@ -70,22 +75,7 @@ TODOStack 是一个基于栈结构的任务管理应用，它提供了一种独�
 
 ## 浏览器支持
 - Chrome (推荐)
-- Firefox
-- Safari
 - Edge
-
-## 开发说明
-1. 克隆仓库
-```bash
-git clone https://github.com/yourusername/todostack.git
-```
-
-2. 打开项目
-```bash
-cd todostack
-```
-
-3. 在浏览器中打开 `index.html` 即可运行
 
 ## 贡献指南
 欢迎提交 Issue 和 Pull Request！
