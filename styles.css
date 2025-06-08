@@ -2559,3 +2559,72 @@ body {
         image-rendering: crisp-edges;
     }
 }
+
+.task-progress-blocks {
+    display: flex;
+    gap: 4px;
+    margin: 15px 0;
+    width: 100%;
+}
+
+.progress-block {
+    flex: 1;
+    height: 24px;
+    background: #e9ecef;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-block:hover {
+    background: #dee2e6;
+}
+
+.progress-block.active {
+    background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+}
+
+.progress-block.active::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%);
+}
+
+.progress-block:hover::before {
+    content: attr(data-percent);
+    position: absolute;
+    top: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #495057;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.progress-block:hover::after {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 4px solid #495057;
+}
+
+/* 移除旧的进度条样式 */
+.task-progress-bar-container,
+.task-progress-bar,
+.task-progress-fill,
+.progress-slider-group {
+    display: none;
+}

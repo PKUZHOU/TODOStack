@@ -368,7 +368,7 @@ class TODOStack {
                         </div>
                     `).join('')}
                     ${imageAttachments.length > 3 ? `
-                        <div class="task-image-more" onclick="todoStack.toggleTaskDetails(${task.id})">
+                        <div class="task-image-more" data-action="toggle-details" data-task-id="${task.id}">
                             <span>+${imageAttachments.length - 3}</span>
                             <div class="more-text">更多</div>
                         </div>
@@ -981,20 +981,8 @@ class TODOStack {
         const progressValue = Math.max(0, Math.min(100, parseInt(progress)));
         task.progress = progressValue;
 
-        // 更新滑块旁边的百分比显示
-        const sliderValueElement = document.querySelector(`.task-progress-slider[data-task-id="${taskId}"]`)
-            ?.parentElement.querySelector('.progress-slider-value');
-        if (sliderValueElement) {
-            sliderValueElement.textContent = progressValue + '%';
-        }
-
-        // 更新详情页的进度条和百分比
-        const progressFillElement = document.querySelector(`#details-${taskId} .task-progress-fill`);
+        // 更新详情页的进度百分比
         const progressPercentageElement = document.querySelector(`#details-${taskId} .task-progress-percentage`);
-        
-        if (progressFillElement) {
-            progressFillElement.style.width = progressValue + '%';
-        }
         if (progressPercentageElement) {
             progressPercentageElement.textContent = progressValue + '%';
         }
@@ -1002,17 +990,14 @@ class TODOStack {
         // 更新缩略图中的迷你进度条
         const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
         if (taskElement) {
-            const miniProgressFill = taskElement.querySelector('.task-progress-mini-fill');
-            const miniProgressText = taskElement.querySelector('.task-progress-mini-text');
             const miniProgressContainer = taskElement.querySelector('.task-progress-mini-container');
             
             if (progressValue > 0) {
-                // 如果进度大于0，显示或更新进度条
                 if (!miniProgressContainer) {
-                    // 如果没有进度条容器，重新生成整个任务元素
                     this.updateStackDisplay();
                 } else {
-                    // 更新现有进度条
+                    const miniProgressFill = miniProgressContainer.querySelector('.task-progress-mini-fill');
+                    const miniProgressText = miniProgressContainer.querySelector('.task-progress-mini-text');
                     if (miniProgressFill) {
                         miniProgressFill.style.width = progressValue + '%';
                     }
@@ -1021,7 +1006,6 @@ class TODOStack {
                     }
                 }
             } else {
-                // 如果进度为0，隐藏进度条
                 if (miniProgressContainer) {
                     miniProgressContainer.style.display = 'none';
                 }
@@ -1054,8 +1038,45 @@ class TODOStack {
         if (progressInput) {
             progressInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
+                    e.stopPropagation();
                     this.addTaskProgress(taskId);
                 }
+            });
+            progressInput.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        }
+
+        // 绑定添加进展按钮的点击事件
+        const addProgressBtn = document.querySelector(`.task-add-progress-btn[data-task-id="${taskId}"]`);
+        if (addProgressBtn) {
+            addProgressBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.addTaskProgress(taskId);
+            });
+        }
+
+        // 绑定进度块的点击事件
+        const progressBlocks = document.querySelectorAll(`.progress-block[data-task-id="${taskId}"]`);
+        progressBlocks.forEach(block => {
+            block.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const progress = parseInt(block.dataset.progress);
+                this.updateTaskProgress(taskId, progress);
+                
+                // 更新进度块的激活状态
+                progressBlocks.forEach(b => {
+                    const blockProgress = parseInt(b.dataset.progress);
+                    b.classList.toggle('active', blockProgress <= progress);
+                });
+            });
+        });
+
+        // 阻止进度条容器的点击事件冒泡
+        const progressContainer = document.querySelector(`.task-progress-section`);
+        if (progressContainer) {
+            progressContainer.addEventListener('click', (e) => {
+                e.stopPropagation();
             });
         }
     }
@@ -1195,10 +1216,18 @@ class TODOStack {
                     <span class="task-progress-percentage">${progress}%</span>
                 </div>
                 
-                <div class="task-progress-bar-container">
-                    <div class="task-progress-bar">
-                        <div class="task-progress-fill" style="width: ${progress}%"></div>
-                    </div>
+                <div class="task-progress-blocks">
+                    ${Array.from({length: 10}, (_, i) => {
+                        const blockProgress = (i + 1) * 10;
+                        const isActive = progress >= blockProgress;
+                        return `
+                            <div class="progress-block ${isActive ? 'active' : ''}" 
+                                 data-progress="${blockProgress}"
+                                 data-task-id="${task.id}"
+                                 data-percent="${blockProgress}%">
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
                 
                 <div class="task-progress-controls">
@@ -1209,20 +1238,9 @@ class TODOStack {
                                maxlength="200"
                                data-task-id="${task.id}">
                         <button class="task-add-progress-btn" 
-                                onclick="todoStack.addTaskProgress(${task.id})">
+                                data-task-id="${task.id}">
                             <i class="fas fa-plus"></i>
                         </button>
-                    </div>
-                    
-                    <div class="progress-slider-group">
-                        <label>进度:</label>
-                        <input type="range" 
-                               class="task-progress-slider" 
-                               min="0" max="100" 
-                               value="${progress}"
-                               data-task-id="${task.id}"
-                               onchange="todoStack.updateTaskProgress(${task.id}, this.value)">
-                        <span class="progress-slider-value">${progress}%</span>
                     </div>
                 </div>
                 
