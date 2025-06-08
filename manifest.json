@@ -6,7 +6,15 @@
   "author": "TODOStack Team",
   
   "permissions": [
-    "storage"
+    "storage",
+    "activeTab",
+    "tabs"
+  ],
+  
+  "host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "file://*/*"
   ],
   
   "action": {

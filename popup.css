@@ -249,9 +249,7 @@ body {
     border-radius: 8px;
     border: 1px solid #e9ecef;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    display: block;
     animation: slideInDown 0.3s ease;
     transition: all 0.3s ease;
     cursor: grab;
@@ -295,20 +293,7 @@ body {
     background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%) !important;
 }
 
-.task-content {
-    flex: 1;
-    font-weight: 500;
-    margin-right: 8px;
-}
-
-.task-meta {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-    font-size: 10px;
-    color: #666;
-}
+/* 原有的task-content和task-meta样式已被新样式替代 */
 
 .task-index {
     background: #e9ecef;
@@ -601,4 +586,155 @@ body {
 @keyframes peekPulse {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.02); }
+}
+
+/* 新增的任务缩略图美化样式 */
+.task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 6px;
+}
+
+.task-title {
+    flex: 1;
+    font-weight: 500;
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.task-priority {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.task-priority.low {
+    background: #d4edda;
+    color: #155724;
+}
+
+.task-priority.medium {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.task-priority.high {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.task-priority.urgent {
+    background: #f5c6cb;
+    color: #721c24;
+    animation: urgentPulse 2s infinite;
+}
+
+@keyframes urgentPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.task-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-bottom: 4px;
+}
+
+.task-tag {
+    background: #e9ecef;
+    color: #495057;
+    padding: 1px 4px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 500;
+}
+
+.task-progress-mini-container {
+    margin-bottom: 4px;
+}
+
+.task-progress-mini {
+    height: 4px;
+    background: #e9ecef;
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+}
+
+.task-progress-mini-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #17a2b8);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.task-progress-mini-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+.task-status-indicators {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.status-indicator {
+    font-size: 9px;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.desc-indicator {
+    color: #17a2b8;
+}
+
+.progress-indicator {
+    font-weight: 600;
+}
+
+.task-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: #666;
+}
+
+.task-meta-left, .task-meta-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.task-stat {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 9px;
+    color: #6c757d;
+}
+
+.task-age {
+    color: #fd7e14;
 } 

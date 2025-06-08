@@ -40,6 +40,9 @@ class TODOStackExtension {
 
         // 检查今日任务计数
         this.checkDailyReset();
+
+        // 监听localStorage变化，实现实时同步
+        this.setupStorageSync();
     }
 
     bindEvents() {
@@ -53,7 +56,7 @@ class TODOStackExtension {
 
         // 栈操作事件
         this.popBtn.addEventListener('click', () => this.pop());
-        this.peekBtn.addEventListener('click', () => this.peek());
+        this.peekBtn.addEventListener('click', () => this.viewTopDetail());
         this.clearBtn.addEventListener('click', () => this.clear());
 
         // 历史记录事件
@@ -115,7 +118,12 @@ class TODOStackExtension {
 
         const task = {
             id: Date.now(),
-            content: taskText,
+            title: taskText,
+            content: taskText, // 保持兼容性
+            priority: 'medium',
+            tags: [],
+            progress: 0,
+            progressHistory: [],
             timestamp: new Date(),
             index: this.stack.length
         };
@@ -149,16 +157,27 @@ class TODOStackExtension {
         this.animateCompletion();
     }
 
-    // 查看栈顶
-    peek() {
+    // 查看栈顶详情
+    viewTopDetail() {
         if (this.stack.length === 0) {
             this.showNotification('栈为空，无栈顶元素', 'warning');
             return;
         }
 
         const topTask = this.stack[this.stack.length - 1];
-        this.highlightTopTask();
-        this.showNotification(`栈顶任务: "${topTask.content}"`, 'info');
+        const taskId = topTask.id;
+        
+        // 构建URL，包含任务ID参数
+        const baseUrl = chrome.runtime.getURL('index.html');
+        const detailUrl = `${baseUrl}?taskId=${taskId}&action=viewDetail`;
+        
+        // 打开新标签页并展开任务详情
+        chrome.tabs.create({ url: detailUrl }, (tab) => {
+            // 关闭插件弹窗
+            window.close();
+        });
+        
+        this.showNotification('正在打开任务详情...', 'info');
     }
 
     // 清空栈
@@ -214,12 +233,49 @@ class TODOStackExtension {
         taskDiv.dataset.stackIndex = stackIndex;
 
         const timeString = this.formatTime(task.timestamp);
+        const title = task.title || task.content || '未命名任务';
+        const priority = task.priority || 'medium';
+        const tags = task.tags || [];
+
+        // 生成标签HTML
+        const tagsHtml = tags.length > 0 
+            ? `<div class="task-tags">
+                ${tags.map(tag => `<span class="task-tag">${this.escapeHtml(tag)}</span>`).join('')}
+               </div>`
+            : '';
+
+        // 生成进度条HTML
+        const progressHtml = task.progress && task.progress > 0 
+            ? `<div class="task-progress-mini-container">
+                <div class="task-progress-mini">
+                    <div class="task-progress-mini-fill" style="width: ${task.progress}%"></div>
+                </div>
+               </div>`
+            : '';
+
+        // 生成状态指示器
+        const statusIndicators = this.generateStatusIndicators(task);
 
         taskDiv.innerHTML = `
-            <div class="task-content">${this.escapeHtml(task.content)}</div>
+            <div class="task-header">
+                <div class="task-title">
+                    ${this.escapeHtml(title)}
+                    ${statusIndicators}
+                </div>
+                <div class="task-priority ${priority}">
+                    ${this.getPriorityIcon(priority)} ${this.getPriorityText(priority)}
+                </div>
+            </div>
+            ${tagsHtml}
+            ${progressHtml}
             <div class="task-meta">
-                <span class="task-index">#${stackIndex + 1}</span>
-                <span class="task-time">${timeString}</span>
+                <div class="task-meta-left">
+                    <span class="task-index">#${this.stack.length - stackIndex}</span>
+                    <span class="task-time">${timeString}</span>
+                </div>
+                <div class="task-meta-right">
+                    ${this.generateTaskStats(task)}
+                </div>
             </div>
         `;
 
@@ -473,8 +529,23 @@ class TODOStackExtension {
 
     // 格式化时间
     formatTime(date) {
+        // 确保 date 是一个有效的 Date 对象
+        let dateObj;
+        if (date instanceof Date) {
+            dateObj = date;
+        } else if (typeof date === 'string' || typeof date === 'number') {
+            dateObj = new Date(date);
+        } else {
+            return '未知时间';
+        }
+
+        // 检查日期是否有效
+        if (isNaN(dateObj.getTime())) {
+            return '无效时间';
+        }
+
         const now = new Date();
-        const diff = now - date;
+        const diff = now - dateObj;
         const minutes = Math.floor(diff / 60000);
         const hours = Math.floor(diff / 3600000);
         const days = Math.floor(diff / 86400000);
@@ -484,7 +555,7 @@ class TODOStackExtension {
         if (hours < 24) return `${hours}小时前`;
         if (days < 7) return `${days}天前`;
         
-        return date.toLocaleDateString('zh-CN', {
+        return dateObj.toLocaleDateString('zh-CN', {
             month: 'short',
             day: 'numeric'
         });
@@ -500,15 +571,14 @@ class TODOStackExtension {
     // 检查每日重置
     checkDailyReset() {
         const today = new Date().toDateString();
-        chrome.storage.local.get(['todostack_last_date'], (result) => {
-            if (result.todostack_last_date !== today) {
-                this.todayTaskCount = 0;
-                chrome.storage.local.set({ todostack_last_date: today });
-            }
-        });
+        const lastDate = localStorage.getItem('todostack_last_date');
+        if (lastDate !== today) {
+            this.todayTaskCount = 0;
+            localStorage.setItem('todostack_last_date', today);
+        }
     }
 
-    // 保存到 Chrome 存储
+    // 保存到本地存储（与网页应用同步）
     saveToStorage() {
         const data = {
             stack: this.stack,
@@ -516,32 +586,159 @@ class TODOStackExtension {
             todayTaskCount: this.todayTaskCount,
             lastUpdated: new Date().toISOString()
         };
-        chrome.storage.local.set({ todostack_data: data });
+        localStorage.setItem('todostack_data', JSON.stringify(data));
     }
 
-    // 从 Chrome 存储加载
+    // 从本地存储加载（与网页应用同步）
     loadFromStorage() {
-        chrome.storage.local.get(['todostack_data'], (result) => {
-            if (result.todostack_data) {
-                const data = result.todostack_data;
-                this.stack = data.stack || [];
-                this.completedTasks = data.completedTasks || [];
-                this.todayTaskCount = data.todayTaskCount || 0;
+        try {
+            const data = localStorage.getItem('todostack_data');
+            if (data) {
+                const parsed = JSON.parse(data);
+                this.stack = parsed.stack || [];
+                this.completedTasks = parsed.completedTasks || [];
+                this.todayTaskCount = parsed.todayTaskCount || 0;
 
                 // 转换时间戳为 Date 对象
                 this.stack.forEach(task => {
                     task.timestamp = new Date(task.timestamp);
+                    // 转换进展记录的时间戳
+                    if (task.progressHistory && Array.isArray(task.progressHistory)) {
+                        task.progressHistory.forEach(entry => {
+                            if (entry.timestamp) {
+                                entry.timestamp = new Date(entry.timestamp);
+                            }
+                        });
+                    }
                 });
                 this.completedTasks.forEach(task => {
                     task.timestamp = new Date(task.timestamp);
                     if (task.completedAt) {
                         task.completedAt = new Date(task.completedAt);
                     }
+                    // 转换进展记录的时间戳
+                    if (task.progressHistory && Array.isArray(task.progressHistory)) {
+                        task.progressHistory.forEach(entry => {
+                            if (entry.timestamp) {
+                                entry.timestamp = new Date(entry.timestamp);
+                            }
+                        });
+                    }
                 });
 
                 this.updateUI();
             }
+        } catch (error) {
+            console.error('加载数据失败:', error);
+            this.showNotification('数据加载失败，使用默认设置', 'error');
+        }
+    }
+
+    // 生成状态指示器
+    generateStatusIndicators(task) {
+        const indicators = [];
+        
+        // 描述指示器
+        if (task.description && task.description.trim()) {
+            indicators.push(`<span class="status-indicator desc-indicator" title="包含详细描述">
+                <i class="fas fa-align-left"></i>
+            </span>`);
+        }
+        
+        // 进度指示器
+        if (task.progress && task.progress > 0) {
+            const progressColor = task.progress >= 100 ? '#28a745' : 
+                                 task.progress >= 75 ? '#17a2b8' :
+                                 task.progress >= 50 ? '#ffc107' : '#fd7e14';
+            indicators.push(`<span class="status-indicator progress-indicator" title="进度 ${task.progress}%" style="color: ${progressColor}">
+                <i class="fas fa-chart-pie"></i> ${task.progress}%
+            </span>`);
+        }
+        
+        return indicators.length > 0 ? `<div class="task-status-indicators">${indicators.join('')}</div>` : '';
+    }
+
+    // 生成任务统计信息
+    generateTaskStats(task) {
+        const stats = [];
+        
+        // 标签数量
+        if (task.tags && task.tags.length > 0) {
+            stats.push(`<span class="task-stat" title="标签数量">
+                <i class="fas fa-tags"></i> ${task.tags.length}
+            </span>`);
+        }
+        
+        // 任务年龄（创建时间）
+        const ageInDays = Math.floor((new Date() - new Date(task.timestamp)) / (1000 * 60 * 60 * 24));
+        if (ageInDays > 0) {
+            stats.push(`<span class="task-stat task-age" title="创建于${ageInDays}天前">
+                <i class="fas fa-clock"></i> ${ageInDays}d
+            </span>`);
+        }
+        
+        return stats.join('');
+    }
+
+    // 获取优先级图标
+    getPriorityIcon(priority) {
+        const icons = {
+            low: '🟢',
+            medium: '🟡',
+            high: '🔴',
+            urgent: '🚨'
+        };
+        return icons[priority] || '🟡';
+    }
+
+    // 获取优先级文本
+    getPriorityText(priority) {
+        const texts = {
+            low: '低',
+            medium: '中',
+            high: '高',
+            urgent: '紧急'
+        };
+        return texts[priority] || '中';
+    }
+
+    // 设置存储同步
+    setupStorageSync() {
+        // 监听localStorage变化（跨标签页同步）
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'todostack_data') {
+                console.log('检测到数据变化，自动同步');
+                this.loadFromStorage();
+            }
         });
+
+        // 定期检查数据变化（同一标签页内的变化）
+        this.lastDataHash = this.getDataHash();
+        setInterval(() => {
+            const currentHash = this.getDataHash();
+            if (currentHash !== this.lastDataHash) {
+                console.log('检测到本地数据变化，刷新UI');
+                this.loadFromStorage();
+                this.lastDataHash = currentHash;
+            }
+        }, 1000); // 每秒检查一次
+    }
+
+    // 获取数据哈希值用于变化检测
+    getDataHash() {
+        const data = localStorage.getItem('todostack_data');
+        return data ? this.simpleHash(data) : '';
+    }
+
+    // 简单哈希函数
+    simpleHash(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // 转换为32位整数
+        }
+        return hash.toString();
     }
 }
 

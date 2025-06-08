@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>查看栈顶详情功能测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .step {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-left: 4px solid #007bff;
+            border-radius: 4px;
+        }
+        .code {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+        .highlight {
+            background: #fff3cd;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #ffc107;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 查看栈顶详情功能测试</h1>
+    
+    <div class="section">
+        <h2>功能说明</h2>
+        <p>现在Chrome插件中的"查看栈顶"按钮功能已升级，点击后会：</p>
+        <ul>
+            <li>自动打开主应用页面</li>
+            <li>定位到栈顶任务</li>
+            <li>自动展开栈顶任务的详细信息</li>
+            <li>高亮显示该任务3秒钟</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>测试步骤</h2>
+        
+        <div class="step">
+            <h3>步骤1：准备测试数据</h3>
+            <p>在主应用中添加一些任务，确保栈中有任务存在</p>
+            <button onclick="addTestTasks()">添加测试任务</button>
+        </div>
+
+        <div class="step">
+            <h3>步骤2：打开Chrome插件</h3>
+            <p>点击浏览器工具栏中的TODOStack插件图标</p>
+        </div>
+
+        <div class="step">
+            <h3>步骤3：点击查看栈顶</h3>
+            <p>在插件中找到蓝色的"查看栈顶"按钮（图标为 👁️），点击它</p>
+        </div>
+
+        <div class="step">
+            <h3>步骤4：验证效果</h3>
+            <p>应该看到：</p>
+            <ul>
+                <li>自动打开了主应用页面</li>
+                <li>页面滚动到栈顶任务位置</li>
+                <li>栈顶任务被蓝色边框高亮显示</li>
+                <li>栈顶任务的详细信息自动展开</li>
+                <li>显示成功通知消息</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>技术实现</h2>
+        
+        <h3>插件端实现：</h3>
+        <div class="code">
+// peek按钮现在直接调用查看栈顶详情功能
+this.peekBtn.addEventListener('click', () => this.viewTopDetail());
+
+// 查看栈顶详情
+viewTopDetail() {
+    const topTask = this.stack[this.stack.length - 1];
+    const taskId = topTask.id;
+    
+    // 构建URL，包含任务ID参数
+    const baseUrl = chrome.runtime.getURL('index.html');
+    const detailUrl = `${baseUrl}?taskId=${taskId}&action=viewDetail`;
+    
+    // 打开新标签页并展开任务详情
+    chrome.tabs.create({ url: detailUrl });
+}
+        </div>
+
+        <h3>主应用端实现：</h3>
+        <div class="code">
+// 处理URL参数
+handleUrlParameters() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const taskId = urlParams.get('taskId');
+    const action = urlParams.get('action');
+
+    if (taskId && action === 'viewDetail') {
+        setTimeout(() => {
+            this.openTaskDetailFromUrl(parseInt(taskId));
+        }, 500);
+    }
+}
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>按钮样式</h2>
+        <p>升级后的"查看栈顶"按钮具有以下特点：</p>
+        <ul>
+            <li>蓝色渐变背景 (#17a2b8 到 #6f42c1)</li>
+            <li>眼睛图标 (fas fa-eye)</li>
+            <li>悬停时有阴影效果</li>
+            <li>当栈为空时自动禁用</li>
+            <li>功能从简单查看升级为打开详情页面</li>
+        </ul>
+    </div>
+
+    <div class="highlight">
+        <h3>⚠️ 注意事项</h3>
+        <ul>
+            <li>确保Chrome插件已正确安装并加载</li>
+            <li>插件需要有创建新标签页的权限</li>
+            <li>主应用和插件的数据已同步</li>
+            <li>栈中必须有任务才能使用此功能</li>
+        </ul>
+    </div>
+
+    <script>
+        function addTestTasks() {
+            // 获取现有数据
+            let data = {
+                stack: [],
+                completedTasks: [],
+                todayTaskCount: 0
+            };
+            
+            const existing = localStorage.getItem('todostack_data');
+            if (existing) {
+                try {
+                    data = JSON.parse(existing);
+                } catch (error) {
+                    console.error('解析现有数据失败:', error);
+                }
+            }
+            
+            // 添加测试任务
+            const testTasks = [
+                {
+                    id: Date.now() + 1,
+                    title: '完成项目文档',
+                    description: '# 项目文档\n\n需要完成以下内容：\n- API文档\n- 用户手册\n- 部署指南',
+                    priority: 'high',
+                    tags: ['文档', '项目'],
+                    progress: 30,
+                    progressHistory: [],
+                    timestamp: new Date().toISOString(),
+                    deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    url: 'https://github.com/example/project'
+                },
+                {
+                    id: Date.now() + 2,
+                    title: '代码审查',
+                    description: '审查新功能的代码实现',
+                    priority: 'medium',
+                    tags: ['代码', '审查'],
+                    progress: 0,
+                    progressHistory: [],
+                    timestamp: new Date().toISOString()
+                },
+                {
+                    id: Date.now() + 3,
+                    title: '会议准备',
+                    description: '准备明天的项目会议材料',
+                    priority: 'urgent',
+                    tags: ['会议'],
+                    progress: 80,
+                    progressHistory: [],
+                    timestamp: new Date().toISOString()
+                }
+            ];
+            
+            // 添加到栈中
+            data.stack.push(...testTasks);
+            data.todayTaskCount = (data.todayTaskCount || 0) + testTasks.length;
+            data.lastUpdated = new Date().toISOString();
+            
+            // 保存数据
+            localStorage.setItem('todostack_data', JSON.stringify(data));
+            
+            alert(`已添加${testTasks.length}个测试任务！\n现在可以测试"查看栈顶详情"功能了。`);
+        }
+        
+        // 显示当前栈顶任务信息
+        function showTopTask() {
+            const data = localStorage.getItem('todostack_data');
+            if (data) {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.stack && parsed.stack.length > 0) {
+                        const topTask = parsed.stack[parsed.stack.length - 1];
+                        alert(`当前栈顶任务：\n标题：${topTask.title}\n优先级：${topTask.priority}\nID：${topTask.id}`);
+                    } else {
+                        alert('栈为空，没有任务');
+                    }
+                } catch (error) {
+                    alert('数据解析错误');
+                }
+            } else {
+                alert('没有找到数据');
+            }
+        }
+    </script>
+    
+    <div class="section">
+        <h2>快速操作</h2>
+        <button onclick="showTopTask()">查看当前栈顶任务</button>
+        <button onclick="window.open('index.html', '_blank')">打开主应用</button>
+        <button onclick="localStorage.removeItem('todostack_data'); alert('数据已清空')">清空数据</button>
+    </div>
+</body>
+</html> 
