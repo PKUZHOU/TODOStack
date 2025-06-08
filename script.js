@@ -338,19 +338,41 @@ class TODOStack {
                </div>`
             : '';
 
+        // 生成进度条HTML
+        const progressHtml = task.progress && task.progress > 0 
+            ? `<div class="task-progress-mini-container">
+                <div class="task-progress-mini">
+                    <div class="task-progress-mini-fill" style="width: ${task.progress}%"></div>
+                    <div class="task-progress-mini-text">${task.progress}%</div>
+                </div>
+               </div>`
+            : '';
+
+        // 生成状态指示器
+        const statusIndicators = this.generateStatusIndicators(task);
+        
         taskDiv.innerHTML = `
             <div class="task-header">
-                <div class="task-title">${this.escapeHtml(title)}</div>
+                <div class="task-title">
+                    ${this.escapeHtml(title)}
+                    ${statusIndicators}
+                </div>
                 <div class="task-priority ${priority}">
                     ${this.getPriorityIcon(priority)} ${this.getPriorityText(priority)}
                 </div>
             </div>
             ${deadlineHtml}
             ${tagsHtml}
+            ${progressHtml}
             ${imagePreviewHtml}
             <div class="task-meta">
-                <span class="task-index">#${this.stack.length - stackIndex}</span>
-                <span class="task-time">${timeString}</span>
+                <div class="task-meta-left">
+                    <span class="task-index">#${this.stack.length - stackIndex}</span>
+                    <span class="task-time">${timeString}</span>
+                </div>
+                <div class="task-meta-right">
+                    ${this.generateTaskStats(task)}
+                </div>
             </div>
             <button class="expand-toggle" onclick="todoStack.toggleTaskDetails(${task.id})">
                 <i class="fas fa-chevron-down"></i>
@@ -488,8 +510,24 @@ class TODOStack {
 
     // 格式化时间
     formatTime(date) {
+        // 确保 date 是一个有效的 Date 对象
+        let dateObj;
+        if (date instanceof Date) {
+            dateObj = date;
+        } else if (typeof date === 'string' || typeof date === 'number') {
+            dateObj = new Date(date);
+        } else {
+            // 如果无法转换，返回默认值
+            return '未知时间';
+        }
+
+        // 检查日期是否有效
+        if (isNaN(dateObj.getTime())) {
+            return '无效时间';
+        }
+
         const now = new Date();
-        const diff = now - date;
+        const diff = now - dateObj;
         const minutes = Math.floor(diff / 60000);
         const hours = Math.floor(diff / 3600000);
         const days = Math.floor(diff / 86400000);
@@ -499,7 +537,7 @@ class TODOStack {
         if (hours < 24) return `${hours}小时前`;
         if (days < 7) return `${days}天前`;
         
-        return date.toLocaleDateString('zh-CN', {
+        return dateObj.toLocaleDateString('zh-CN', {
             month: 'short',
             day: 'numeric'
         });
@@ -547,11 +585,27 @@ class TODOStack {
                 // 转换时间戳为 Date 对象
                 this.stack.forEach(task => {
                     task.timestamp = new Date(task.timestamp);
+                    // 转换进展记录的时间戳
+                    if (task.progressHistory && Array.isArray(task.progressHistory)) {
+                        task.progressHistory.forEach(entry => {
+                            if (entry.timestamp) {
+                                entry.timestamp = new Date(entry.timestamp);
+                            }
+                        });
+                    }
                 });
                 this.completedTasks.forEach(task => {
                     task.timestamp = new Date(task.timestamp);
                     if (task.completedAt) {
                         task.completedAt = new Date(task.completedAt);
+                    }
+                    // 转换进展记录的时间戳
+                    if (task.progressHistory && Array.isArray(task.progressHistory)) {
+                        task.progressHistory.forEach(entry => {
+                            if (entry.timestamp) {
+                                entry.timestamp = new Date(entry.timestamp);
+                            }
+                        });
                     }
                 });
             }
@@ -597,11 +651,27 @@ class TODOStack {
                     // 转换时间戳
                     this.stack.forEach(task => {
                         task.timestamp = new Date(task.timestamp);
+                        // 转换进展记录的时间戳
+                        if (task.progressHistory && Array.isArray(task.progressHistory)) {
+                            task.progressHistory.forEach(entry => {
+                                if (entry.timestamp) {
+                                    entry.timestamp = new Date(entry.timestamp);
+                                }
+                            });
+                        }
                     });
                     this.completedTasks.forEach(task => {
                         task.timestamp = new Date(task.timestamp);
                         if (task.completedAt) {
                             task.completedAt = new Date(task.completedAt);
+                        }
+                        // 转换进展记录的时间戳
+                        if (task.progressHistory && Array.isArray(task.progressHistory)) {
+                            task.progressHistory.forEach(entry => {
+                                if (entry.timestamp) {
+                                    entry.timestamp = new Date(entry.timestamp);
+                                }
+                            });
                         }
                     });
                     
@@ -874,7 +944,7 @@ class TODOStack {
             sliderValueElement.textContent = progressValue + '%';
         }
 
-        // 更新进度条和百分比
+        // 更新详情页的进度条和百分比
         const progressFillElement = document.querySelector(`#details-${taskId} .task-progress-fill`);
         const progressPercentageElement = document.querySelector(`#details-${taskId} .task-progress-percentage`);
         
@@ -883,6 +953,35 @@ class TODOStack {
         }
         if (progressPercentageElement) {
             progressPercentageElement.textContent = progressValue + '%';
+        }
+
+        // 更新缩略图中的迷你进度条
+        const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+        if (taskElement) {
+            const miniProgressFill = taskElement.querySelector('.task-progress-mini-fill');
+            const miniProgressText = taskElement.querySelector('.task-progress-mini-text');
+            const miniProgressContainer = taskElement.querySelector('.task-progress-mini-container');
+            
+            if (progressValue > 0) {
+                // 如果进度大于0，显示或更新进度条
+                if (!miniProgressContainer) {
+                    // 如果没有进度条容器，重新生成整个任务元素
+                    this.updateStackDisplay();
+                } else {
+                    // 更新现有进度条
+                    if (miniProgressFill) {
+                        miniProgressFill.style.width = progressValue + '%';
+                    }
+                    if (miniProgressText) {
+                        miniProgressText.textContent = progressValue + '%';
+                    }
+                }
+            } else {
+                // 如果进度为0，隐藏进度条
+                if (miniProgressContainer) {
+                    miniProgressContainer.style.display = 'none';
+                }
+            }
         }
 
         this.saveToStorage();
@@ -1096,9 +1195,9 @@ class TODOStack {
                                 .map(entry => `
                                     <div class="task-progress-item">
                                         <div class="task-progress-item-header">
-                                            <span class="task-progress-item-time">${this.formatTime(entry.timestamp)}</span>
+                                            <span class="task-progress-item-time">${this.formatTime(entry.timestamp || new Date())}</span>
                                         </div>
-                                        <div class="task-progress-item-text">${this.escapeHtml(entry.text)}</div>
+                                        <div class="task-progress-item-text">${this.escapeHtml(entry.text || '')}</div>
                                     </div>
                                 `).join('')
                         }
@@ -1472,6 +1571,76 @@ class TODOStack {
             });
             element.setAttribute('data-event-bound', 'true');
         });
+    }
+
+    // 生成状态指示器
+    generateStatusIndicators(task) {
+        const indicators = [];
+        
+        // 附件指示器
+        if (task.attachments && task.attachments.length > 0) {
+            const imageCount = task.attachments.filter(att => att.isImage).length;
+            const fileCount = task.attachments.length - imageCount;
+            
+            if (imageCount > 0) {
+                indicators.push(`<span class="status-indicator image-indicator" title="${imageCount}张图片">
+                    <i class="fas fa-image"></i> ${imageCount}
+                </span>`);
+            }
+            if (fileCount > 0) {
+                indicators.push(`<span class="status-indicator file-indicator" title="${fileCount}个文件">
+                    <i class="fas fa-paperclip"></i> ${fileCount}
+                </span>`);
+            }
+        }
+        
+        // 描述指示器
+        if (task.description && task.description.trim()) {
+            indicators.push(`<span class="status-indicator desc-indicator" title="包含详细描述">
+                <i class="fas fa-align-left"></i>
+            </span>`);
+        }
+        
+        // URL指示器
+        if (task.url && task.url.trim()) {
+            indicators.push(`<span class="status-indicator url-indicator" title="包含链接">
+                <i class="fas fa-link"></i>
+            </span>`);
+        }
+        
+        // 进度指示器
+        if (task.progress && task.progress > 0) {
+            const progressColor = task.progress >= 100 ? '#28a745' : 
+                                 task.progress >= 75 ? '#17a2b8' :
+                                 task.progress >= 50 ? '#ffc107' : '#fd7e14';
+            indicators.push(`<span class="status-indicator progress-indicator" title="进度 ${task.progress}%" style="color: ${progressColor}">
+                <i class="fas fa-chart-pie"></i> ${task.progress}%
+            </span>`);
+        }
+        
+        return indicators.length > 0 ? `<div class="task-status-indicators">${indicators.join('')}</div>` : '';
+    }
+
+    // 生成任务统计信息
+    generateTaskStats(task) {
+        const stats = [];
+        
+        // 标签数量
+        if (task.tags && task.tags.length > 0) {
+            stats.push(`<span class="task-stat" title="标签数量">
+                <i class="fas fa-tags"></i> ${task.tags.length}
+            </span>`);
+        }
+        
+        // 任务年龄（创建时间）
+        const ageInDays = Math.floor((new Date() - new Date(task.timestamp)) / (1000 * 60 * 60 * 24));
+        if (ageInDays > 0) {
+            stats.push(`<span class="task-stat task-age" title="创建于${ageInDays}天前">
+                <i class="fas fa-clock"></i> ${ageInDays}d
+            </span>`);
+        }
+        
+        return stats.join('');
     }
 }
 
