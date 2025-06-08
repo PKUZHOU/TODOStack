@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Markdown 解析库 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -25,9 +27,13 @@
                     <input 
                         type="text" 
                         id="taskInput" 
-                        placeholder="输入新任务..." 
+                        placeholder="输入任务标题..." 
                         maxlength="100"
                     >
+                    <button id="toggleDetailsBtn" class="details-btn">
+                        <i class="fas fa-edit"></i>
+                        详情
+                    </button>
                     <button id="pushBtn" class="push-btn">
                         <i class="fas fa-plus"></i>
                         入栈 (Push)
@@ -36,6 +42,91 @@
                 <div class="stack-info">
                     <span class="stack-size">栈大小: <span id="stackSize">0</span></span>
                     <span class="operation-hint">提示: 按 Enter 键快速添加任务</span>
+                </div>
+
+                <!-- 任务详情输入区域 -->
+                <div id="taskDetailsSection" class="task-details-section" style="display: none;">
+                    <div class="details-header">
+                        <h4><i class="fas fa-info-circle"></i> 任务详情</h4>
+                        <button id="collapseDetailsBtn" class="collapse-btn">
+                            <i class="fas fa-chevron-up"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="details-grid">
+                        <div class="detail-row">
+                            <div class="detail-item">
+                                <label for="taskDeadline">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    截止日期
+                                </label>
+                                <input type="datetime-local" id="taskDeadline">
+                            </div>
+                            <div class="detail-item">
+                                <label for="taskPriority">
+                                    <i class="fas fa-star"></i>
+                                    优先级
+                                </label>
+                                <select id="taskPriority">
+                                    <option value="low">🟢 低</option>
+                                    <option value="medium" selected>🟡 中</option>
+                                    <option value="high">🔴 高</option>
+                                    <option value="urgent">🚨 紧急</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-item full-width">
+                            <label for="taskDescription">
+                                <i class="fas fa-align-left"></i>
+                                任务描述 (支持 Markdown)
+                            </label>
+                            <div class="description-container">
+                                <textarea 
+                                    id="taskDescription" 
+                                    placeholder="详细描述任务内容，支持 Markdown 格式...&#10;&#10;例如：&#10;- [ ] 子任务1&#10;- [ ] 子任务2&#10;&#10;**重要提醒**：记得检查相关文档&#10;&#10;[相关链接](https://example.com)"
+                                    rows="8"
+                                ></textarea>
+                                <div class="markdown-preview" id="markdownPreview" style="display: none;"></div>
+                                <div class="description-controls">
+                                    <button type="button" id="previewBtn" class="preview-btn">
+                                        <i class="fas fa-eye"></i>
+                                        预览
+                                    </button>
+                                    <button type="button" id="editBtn" class="edit-btn" style="display: none;">
+                                        <i class="fas fa-edit"></i>
+                                        编辑
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-item full-width">
+                            <label for="taskUrl">
+                                <i class="fas fa-link"></i>
+                                相关链接
+                            </label>
+                            <input type="url" id="taskUrl" placeholder="https://example.com">
+                        </div>
+                        
+                        <div class="detail-item full-width">
+                            <label for="taskFile">
+                                <i class="fas fa-paperclip"></i>
+                                附件 (图片、文档等)
+                            </label>
+                            <input type="file" id="taskFile" accept="image/*,.pdf,.doc,.docx,.txt" multiple>
+                            <div id="attachmentsList" class="attachments-list"></div>
+                        </div>
+                        
+                        <div class="detail-item full-width">
+                            <label for="taskTags">
+                                <i class="fas fa-tags"></i>
+                                标签
+                            </label>
+                            <input type="text" id="taskTags" placeholder="输入标签，用逗号分隔 (如: 工作, 紧急, 项目A)">
+                            <div id="tagsList" class="tags-list"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -46,8 +137,8 @@
                     完成栈顶任务 (Pop)
                 </button>
                 <button id="peekBtn" class="peek-btn" disabled>
-                    <i class="fas fa-eye"></i>
-                    查看栈顶 (Peek)
+                    <i class="fas fa-search-plus"></i>
+                    查看栈顶详情 (Peek)
                 </button>
                 <button id="clearBtn" class="clear-btn" disabled>
                     <i class="fas fa-trash"></i>
@@ -172,10 +263,10 @@
                         </div>
                     </div>
                     <div class="help-item">
-                        <i class="fas fa-eye"></i>
+                        <i class="fas fa-search-plus"></i>
                         <div>
-                            <h4>查看栈顶 (Peek)</h4>
-                            <p>查看当前栈顶任务，但不移除它。</p>
+                            <h4>查看栈顶详情 (Peek)</h4>
+                            <p>自动展开栈顶任务的详细信息，包括描述、截止日期、附件等。再次点击可收起详情。</p>
                         </div>
                     </div>
                     <div class="help-item">

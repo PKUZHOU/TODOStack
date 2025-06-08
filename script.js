@@ -28,10 +28,28 @@ class TODOStack {
         this.historyContainer = document.getElementById('historyContainer');
         this.historyList = document.getElementById('historyList');
 
+        // 任务详情相关元素
+        this.toggleDetailsBtn = document.getElementById('toggleDetailsBtn');
+        this.collapseDetailsBtn = document.getElementById('collapseDetailsBtn');
+        this.taskDetailsSection = document.getElementById('taskDetailsSection');
+        this.taskDeadline = document.getElementById('taskDeadline');
+        this.taskPriority = document.getElementById('taskPriority');
+        this.taskDescription = document.getElementById('taskDescription');
+        this.taskUrl = document.getElementById('taskUrl');
+        this.taskFile = document.getElementById('taskFile');
+        this.taskTags = document.getElementById('taskTags');
+        this.attachmentsList = document.getElementById('attachmentsList');
+        this.tagsList = document.getElementById('tagsList');
+        this.previewBtn = document.getElementById('previewBtn');
+        this.editBtn = document.getElementById('editBtn');
+        this.markdownPreview = document.getElementById('markdownPreview');
+
         // 拖拽相关属性
         this.draggedElement = null;
         this.draggedIndex = null;
         this.historyVisible = false;
+        this.detailsVisible = false;
+        this.attachments = [];
 
         // 绑定事件
         this.bindEvents();
@@ -44,7 +62,7 @@ class TODOStack {
         // 入栈事件
         this.pushBtn.addEventListener('click', () => this.push());
         this.taskInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !this.detailsVisible) {
                 this.push();
             }
         });
@@ -57,6 +75,26 @@ class TODOStack {
         // 历史记录事件
         this.toggleHistoryBtn.addEventListener('click', () => this.toggleHistory());
         this.clearHistoryBtn.addEventListener('click', () => this.clearHistory());
+
+        // 任务详情事件
+        this.toggleDetailsBtn.addEventListener('click', () => this.toggleDetails());
+        this.collapseDetailsBtn.addEventListener('click', () => this.toggleDetails());
+        
+        // Markdown 预览事件
+        this.previewBtn.addEventListener('click', () => this.showMarkdownPreview());
+        this.editBtn.addEventListener('click', () => this.hideMarkdownPreview());
+
+        // 文件上传事件
+        this.taskFile.addEventListener('change', (e) => this.handleFileUpload(e));
+
+        // 标签输入事件
+        this.taskTags.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.addTag();
+            }
+        });
+        this.taskTags.addEventListener('input', () => this.updateTagsList());
 
         // 模态框事件
         this.helpBtn.addEventListener('click', () => this.showHelp());
@@ -79,6 +117,10 @@ class TODOStack {
                         e.preventDefault();
                         this.pop();
                         break;
+                    case 'd':
+                        e.preventDefault();
+                        this.toggleDetails();
+                        break;
                 }
             }
         });
@@ -89,25 +131,34 @@ class TODOStack {
         const taskText = this.taskInput.value.trim();
         if (!taskText) {
             this.taskInput.focus();
-            this.showNotification('请输入任务内容', 'warning');
+            this.showNotification('请输入任务标题', 'warning');
             return;
         }
 
         if (taskText.length > 100) {
-            this.showNotification('任务内容不能超过100个字符', 'error');
+            this.showNotification('任务标题不能超过100个字符', 'error');
             return;
         }
 
+        // 收集任务详情
         const task = {
             id: Date.now(),
-            content: taskText,
+            title: taskText,
+            description: this.taskDescription.value.trim(),
+            deadline: this.taskDeadline.value || null,
+            priority: this.taskPriority.value,
+            url: this.taskUrl.value.trim() || null,
+            tags: this.getTagsFromInput(),
+            attachments: [...this.attachments],
             timestamp: new Date(),
             index: this.stack.length
         };
 
         this.stack.push(task);
         this.todayTaskCount++;
-        this.taskInput.value = '';
+        
+        // 清空输入
+        this.clearTaskInputs();
         this.taskInput.focus();
 
         this.updateUI();
@@ -130,7 +181,7 @@ class TODOStack {
 
         this.updateUI();
         this.saveToStorage();
-        this.showNotification(`任务 "${task.content}" 已完成并出栈`, 'success');
+        this.showNotification(`任务 "${task.title}" 已完成并出栈`, 'success');
 
         // 添加完成动画
         this.animateCompletion();
@@ -144,8 +195,39 @@ class TODOStack {
         }
 
         const topTask = this.stack[this.stack.length - 1];
+        
+        // 高亮栈顶任务
         this.highlightTopTask();
-        this.showNotification(`栈顶任务: "${topTask.content}"`, 'info');
+        
+        // 自动展开栈顶任务的详情
+        const topTaskElement = this.taskStack.querySelector('.task-item:first-child');
+        if (topTaskElement) {
+            const taskId = topTask.id;
+            const detailsElement = document.getElementById(`details-${taskId}`);
+            const toggleButton = topTaskElement.querySelector('.expand-toggle');
+            
+            if (detailsElement && !detailsElement.classList.contains('show')) {
+                // 展开详情
+                detailsElement.classList.add('show');
+                toggleButton.classList.add('expanded');
+                topTaskElement.classList.add('expanded');
+                
+                // 滚动到栈顶任务
+                topTaskElement.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'center' 
+                });
+                
+                this.showNotification(`已展开栈顶任务详情: "${topTask.title}"`, 'success');
+            } else if (detailsElement && detailsElement.classList.contains('show')) {
+                // 如果已经展开，则收起
+                detailsElement.classList.remove('show');
+                toggleButton.classList.remove('expanded');
+                topTaskElement.classList.remove('expanded');
+                
+                this.showNotification(`已收起栈顶任务详情: "${topTask.title}"`, 'info');
+            }
+        }
     }
 
     // 清空栈
@@ -202,13 +284,51 @@ class TODOStack {
         taskDiv.dataset.stackIndex = stackIndex;
 
         const timeString = this.formatTime(task.timestamp);
-        const isTop = stackIndex === this.stack.length - 1;
+        
+        // 处理旧版本任务数据兼容性
+        const title = task.title || task.content || '未命名任务';
+        const priority = task.priority || 'medium';
+        const tags = task.tags || [];
+        const deadline = task.deadline;
+
+        // 计算截止日期状态
+        const deadlineStatus = this.getDeadlineStatus(deadline);
+        const deadlineClass = deadlineStatus.class;
+        const deadlineText = deadlineStatus.text;
+
+        // 生成标签HTML
+        const tagsHtml = tags.length > 0 
+            ? `<div class="task-tags">
+                ${tags.map(tag => `<span class="task-tag">${this.escapeHtml(tag)}</span>`).join('')}
+               </div>`
+            : '';
+
+        // 生成截止日期HTML
+        const deadlineHtml = deadline 
+            ? `<div class="task-deadline ${deadlineClass}">
+                <i class="fas fa-calendar-alt"></i>
+                ${deadlineText}
+               </div>`
+            : '';
 
         taskDiv.innerHTML = `
-            <div class="task-content">${this.escapeHtml(task.content)}</div>
+            <div class="task-header">
+                <div class="task-title">${this.escapeHtml(title)}</div>
+                <div class="task-priority ${priority}">
+                    ${this.getPriorityIcon(priority)} ${this.getPriorityText(priority)}
+                </div>
+            </div>
+            ${deadlineHtml}
+            ${tagsHtml}
             <div class="task-meta">
-                <span class="task-index">#${stackIndex + 1}</span>
+                <span class="task-index">#${this.stack.length - stackIndex}</span>
                 <span class="task-time">${timeString}</span>
+            </div>
+            <button class="expand-toggle" onclick="todoStack.toggleTaskDetails(${task.id})">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+            <div class="task-details" id="details-${task.id}">
+                ${this.generateTaskDetailsHtml(task)}
             </div>
         `;
 
@@ -582,11 +702,20 @@ class TODOStack {
 
         const completedTime = this.formatTime(task.completedAt);
         const originalTime = this.formatTime(task.timestamp);
+        
+        // 处理旧版本任务数据兼容性
+        const title = task.title || task.content || '未命名任务';
+        const priority = task.priority || 'medium';
 
         historyDiv.innerHTML = `
             <div class="history-content">
                 <i class="fas fa-check-circle check-icon"></i>
-                <span class="history-text">${this.escapeHtml(task.content)}</span>
+                <div class="history-task-info">
+                    <span class="history-text">${this.escapeHtml(title)}</span>
+                    <span class="history-priority ${priority}">
+                        ${this.getPriorityIcon(priority)} ${this.getPriorityText(priority)}
+                    </span>
+                </div>
             </div>
             <div class="history-meta">
                 <span class="history-completed-time">完成于 ${completedTime}</span>
@@ -610,6 +739,286 @@ class TODOStack {
             this.saveToStorage();
             this.showNotification('历史记录已清空', 'success');
         }
+    }
+
+    // ===== 新增的任务详情功能方法 =====
+
+    // 切换任务详情输入区域
+    toggleDetails() {
+        this.detailsVisible = !this.detailsVisible;
+        
+        if (this.detailsVisible) {
+            this.taskDetailsSection.style.display = 'block';
+            this.toggleDetailsBtn.classList.add('active');
+            this.toggleDetailsBtn.innerHTML = '<i class="fas fa-edit"></i> 收起';
+        } else {
+            this.taskDetailsSection.style.display = 'none';
+            this.toggleDetailsBtn.classList.remove('active');
+            this.toggleDetailsBtn.innerHTML = '<i class="fas fa-edit"></i> 详情';
+        }
+    }
+
+    // 切换任务详情显示
+    toggleTaskDetails(taskId) {
+        const detailsElement = document.getElementById(`details-${taskId}`);
+        const toggleButton = detailsElement.parentElement.querySelector('.expand-toggle');
+        
+        if (detailsElement.classList.contains('show')) {
+            detailsElement.classList.remove('show');
+            toggleButton.classList.remove('expanded');
+            detailsElement.parentElement.classList.remove('expanded');
+        } else {
+            detailsElement.classList.add('show');
+            toggleButton.classList.add('expanded');
+            detailsElement.parentElement.classList.add('expanded');
+        }
+    }
+
+    // 生成任务详情HTML
+    generateTaskDetailsHtml(task) {
+        const description = task.description || '';
+        const url = task.url || '';
+        const attachments = task.attachments || [];
+
+        let html = '';
+
+        // 描述
+        if (description) {
+            html += `
+                <div class="task-description">
+                    ${this.parseMarkdown(description)}
+                </div>
+            `;
+        }
+
+        // 相关链接
+        if (url) {
+            html += `
+                <a href="${url}" target="_blank" class="task-url">
+                    <i class="fas fa-external-link-alt"></i>
+                    ${this.escapeHtml(url)}
+                </a>
+            `;
+        }
+
+        // 附件
+        if (attachments.length > 0) {
+            html += `
+                <div class="task-attachments">
+                    ${attachments.map(attachment => `
+                        <div class="task-attachment">
+                            <i class="fas fa-paperclip"></i>
+                            ${this.escapeHtml(attachment.name)}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        return html || '<p style="color: #6c757d; font-style: italic;">暂无详细信息</p>';
+    }
+
+    // 解析Markdown
+    parseMarkdown(text) {
+        if (typeof marked !== 'undefined') {
+            return marked.parse(text);
+        } else {
+            // 简单的Markdown解析
+            return text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/`(.*?)`/g, '<code>$1</code>')
+                .replace(/\n/g, '<br>');
+        }
+    }
+
+    // 显示Markdown预览
+    showMarkdownPreview() {
+        const text = this.taskDescription.value;
+        this.markdownPreview.innerHTML = this.parseMarkdown(text);
+        this.taskDescription.style.display = 'none';
+        this.markdownPreview.style.display = 'block';
+        this.previewBtn.style.display = 'none';
+        this.editBtn.style.display = 'inline-flex';
+    }
+
+    // 隐藏Markdown预览
+    hideMarkdownPreview() {
+        this.taskDescription.style.display = 'block';
+        this.markdownPreview.style.display = 'none';
+        this.previewBtn.style.display = 'inline-flex';
+        this.editBtn.style.display = 'none';
+    }
+
+    // 处理文件上传
+    handleFileUpload(event) {
+        const files = Array.from(event.target.files);
+        files.forEach(file => {
+            if (file.size > 10 * 1024 * 1024) { // 10MB限制
+                this.showNotification(`文件 ${file.name} 超过10MB限制`, 'error');
+                return;
+            }
+
+            const attachment = {
+                id: Date.now() + Math.random(),
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                data: null // 在实际应用中可以转换为base64
+            };
+
+            this.attachments.push(attachment);
+            this.updateAttachmentsList();
+        });
+    }
+
+    // 更新附件列表
+    updateAttachmentsList() {
+        this.attachmentsList.innerHTML = '';
+        this.attachments.forEach(attachment => {
+            const attachmentDiv = document.createElement('div');
+            attachmentDiv.className = 'attachment-item';
+            attachmentDiv.innerHTML = `
+                <i class="fas fa-paperclip"></i>
+                <span>${this.escapeHtml(attachment.name)}</span>
+                <button class="remove-btn" onclick="todoStack.removeAttachment(${attachment.id})">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            this.attachmentsList.appendChild(attachmentDiv);
+        });
+    }
+
+    // 移除附件
+    removeAttachment(attachmentId) {
+        this.attachments = this.attachments.filter(a => a.id !== attachmentId);
+        this.updateAttachmentsList();
+    }
+
+    // 添加标签
+    addTag() {
+        const tagText = this.taskTags.value.trim();
+        if (!tagText) return;
+
+        const tags = tagText.split(',').map(tag => tag.trim()).filter(tag => tag);
+        this.updateTagsDisplay(tags);
+        this.taskTags.value = '';
+    }
+
+    // 更新标签列表
+    updateTagsList() {
+        const tagText = this.taskTags.value.trim();
+        if (!tagText) {
+            this.tagsList.innerHTML = '';
+            return;
+        }
+
+        const tags = tagText.split(',').map(tag => tag.trim()).filter(tag => tag);
+        this.updateTagsDisplay(tags);
+    }
+
+    // 更新标签显示
+    updateTagsDisplay(tags) {
+        this.tagsList.innerHTML = '';
+        tags.forEach(tag => {
+            const tagDiv = document.createElement('div');
+            tagDiv.className = 'tag-item';
+            tagDiv.innerHTML = `
+                <span>${this.escapeHtml(tag)}</span>
+                <button class="remove-tag" onclick="todoStack.removeTagFromDisplay('${tag}')">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            this.tagsList.appendChild(tagDiv);
+        });
+    }
+
+    // 从显示中移除标签
+    removeTagFromDisplay(tagToRemove) {
+        const currentTags = this.taskTags.value.split(',').map(tag => tag.trim()).filter(tag => tag && tag !== tagToRemove);
+        this.taskTags.value = currentTags.join(', ');
+        this.updateTagsList();
+    }
+
+    // 从输入获取标签
+    getTagsFromInput() {
+        const tagText = this.taskTags.value.trim();
+        if (!tagText) return [];
+        return tagText.split(',').map(tag => tag.trim()).filter(tag => tag);
+    }
+
+    // 清空任务输入
+    clearTaskInputs() {
+        this.taskInput.value = '';
+        this.taskDescription.value = '';
+        this.taskDeadline.value = '';
+        this.taskPriority.value = 'medium';
+        this.taskUrl.value = '';
+        this.taskTags.value = '';
+        this.taskFile.value = '';
+        this.attachments = [];
+        this.updateAttachmentsList();
+        this.updateTagsList();
+        this.hideMarkdownPreview();
+    }
+
+    // 获取截止日期状态
+    getDeadlineStatus(deadline) {
+        if (!deadline) return { class: '', text: '' };
+
+        const now = new Date();
+        const deadlineDate = new Date(deadline);
+        const diffTime = deadlineDate - now;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffTime < 0) {
+            return {
+                class: 'overdue',
+                text: `已逾期 ${Math.abs(diffDays)} 天`
+            };
+        } else if (diffDays <= 1) {
+            return {
+                class: 'due-soon',
+                text: diffDays === 0 ? '今天到期' : '明天到期'
+            };
+        } else if (diffDays <= 7) {
+            return {
+                class: 'due-soon',
+                text: `${diffDays} 天后到期`
+            };
+        } else {
+            return {
+                class: '',
+                text: deadlineDate.toLocaleDateString('zh-CN', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                })
+            };
+        }
+    }
+
+    // 获取优先级图标
+    getPriorityIcon(priority) {
+        const icons = {
+            low: '🟢',
+            medium: '🟡',
+            high: '🔴',
+            urgent: '🚨'
+        };
+        return icons[priority] || '🟡';
+    }
+
+    // 获取优先级文本
+    getPriorityText(priority) {
+        const texts = {
+            low: '低',
+            medium: '中',
+            high: '高',
+            urgent: '紧急'
+        };
+        return texts[priority] || '中';
     }
 }
 
@@ -648,4 +1057,6 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('TODOStack 快捷键:');
     console.log('Ctrl/Cmd + Enter: 快速添加任务');
     console.log('Ctrl/Cmd + Backspace: 完成栈顶任务');
+    console.log('Ctrl/Cmd + D: 切换任务详情输入');
+    console.log('点击"查看栈顶详情"按钮: 展开/收起栈顶任务的详细信息');
 }); 
