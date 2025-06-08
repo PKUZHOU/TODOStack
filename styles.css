@@ -1329,6 +1329,7 @@ body {
     align-items: center;
     animation: slideInLeft 0.3s ease;
     transition: all 0.2s ease;
+    gap: 10px;
 }
 
 .history-item:hover {
@@ -1406,6 +1407,37 @@ body {
 
 .history-original-time {
     opacity: 0.7;
+}
+
+.history-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.history-undo-btn {
+    background: #ffc107;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 36px;
+}
+
+.history-undo-btn:hover {
+    background: #e0a800;
+    transform: scale(1.05);
+}
+
+.history-undo-btn:active {
+    transform: scale(0.95);
 }
 
 .empty-history {

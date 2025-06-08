@@ -271,7 +271,9 @@ class TODOStack {
         // 从栈顶到栈底显示任务
         for (let i = this.stack.length - 1; i >= 0; i--) {
             const task = this.stack[i];
-            const taskElement = this.createTaskElement(task, i);
+            // 传递显示位置索引（从0开始，0是栈顶）
+            const displayIndex = this.stack.length - 1 - i;
+            const taskElement = this.createTaskElement(task, displayIndex);
             this.taskStack.appendChild(taskElement);
         }
     }
@@ -664,13 +666,21 @@ class TODOStack {
     reorderStack(fromIndex, toIndex) {
         if (fromIndex === toIndex) return;
 
-        // 从栈顶开始计算实际索引
+        console.log('拖拽排序 - 从位置:', fromIndex, '到位置:', toIndex);
+        console.log('栈长度:', this.stack.length);
+        
+        // fromIndex和toIndex是显示位置索引（0是栈顶）
+        // 需要转换为数组中的实际索引
         const actualFromIndex = this.stack.length - 1 - fromIndex;
         const actualToIndex = this.stack.length - 1 - toIndex;
+        
+        console.log('实际数组索引 - 从:', actualFromIndex, '到:', actualToIndex);
 
         // 移动任务
         const movedTask = this.stack.splice(actualFromIndex, 1)[0];
         this.stack.splice(actualToIndex, 0, movedTask);
+
+        console.log('移动后的栈:', this.stack.map(t => t.title));
 
         this.updateUI();
         this.saveToStorage();
@@ -685,6 +695,8 @@ class TODOStack {
             this.historyContainer.style.display = 'block';
             this.historyContainer.style.animation = 'historySlideDown 0.3s ease forwards';
             this.toggleHistoryBtn.innerHTML = '<i class="fas fa-eye-slash"></i> 隐藏历史';
+            // 当显示历史记录时，立即更新显示
+            this.updateHistoryDisplay();
         } else {
             this.historyContainer.style.animation = 'historySlideUp 0.3s ease forwards';
             setTimeout(() => {
@@ -696,7 +708,8 @@ class TODOStack {
 
     // 更新历史记录显示
     updateHistoryDisplay() {
-        if (!this.historyVisible) return;
+        // 只有当历史记录容器存在时才更新
+        if (!this.historyList) return;
 
         this.historyList.innerHTML = '';
 
@@ -744,6 +757,11 @@ class TODOStack {
                     </span>
                 </div>
             </div>
+            <div class="history-actions">
+                <button class="history-undo-btn" onclick="todoStack.undoComplete('${task.id}')" title="撤销完成">
+                    <i class="fas fa-undo"></i>
+                </button>
+            </div>
             <div class="history-meta">
                 <span class="history-completed-time">完成于 ${completedTime}</span>
                 <span class="history-original-time">创建于 ${originalTime}</span>
@@ -751,6 +769,33 @@ class TODOStack {
         `;
 
         return historyDiv;
+    }
+
+    // 撤销完成任务
+    undoComplete(taskId) {
+        // 确保taskId是数字类型
+        const numericTaskId = parseInt(taskId);
+        const taskIndex = this.completedTasks.findIndex(task => task.id === numericTaskId);
+        if (taskIndex === -1) {
+            this.showNotification('任务未找到', 'error');
+            console.error('撤销失败 - 任务ID:', taskId, '已完成任务列表:', this.completedTasks);
+            return;
+        }
+
+        const task = this.completedTasks[taskIndex];
+        
+        // 从已完成任务中移除
+        this.completedTasks.splice(taskIndex, 1);
+        
+        // 移除完成时间戳，恢复为未完成状态
+        delete task.completedAt;
+        
+        // 重新添加到栈顶（最后一个位置，因为栈是LIFO）
+        this.stack.push(task);
+        
+        this.updateUI();
+        this.saveToStorage();
+        this.showNotification(`任务"${task.title || task.content || '未命名任务'}"已恢复到待完成状态`, 'success');
     }
 
     // 清空历史记录
