@@ -311,6 +311,29 @@ class TODOStack {
                </div>`
             : '';
 
+        // 生成图片预览HTML
+        const imageAttachments = (task.attachments || []).filter(att => att.isImage && att.data);
+        const imagePreviewHtml = imageAttachments.length > 0 
+            ? `<div class="task-image-preview-container">
+                <div class="task-image-preview-grid">
+                    ${imageAttachments.slice(0, 3).map((attachment, index) => `
+                        <div class="task-image-thumb" data-task-id="${task.id}" data-attachment-index="${index}" data-attachment-type="thumb">
+                            <img src="${attachment.data}" alt="${this.escapeHtml(attachment.name)}" />
+                            <div class="thumb-overlay">
+                                <i class="fas fa-search-plus"></i>
+                            </div>
+                        </div>
+                    `).join('')}
+                    ${imageAttachments.length > 3 ? `
+                        <div class="task-image-more" onclick="todoStack.toggleTaskDetails(${task.id})">
+                            <span>+${imageAttachments.length - 3}</span>
+                            <div class="more-text">更多</div>
+                        </div>
+                    ` : ''}
+                </div>
+               </div>`
+            : '';
+
         taskDiv.innerHTML = `
             <div class="task-header">
                 <div class="task-title">${this.escapeHtml(title)}</div>
@@ -320,6 +343,7 @@ class TODOStack {
             </div>
             ${deadlineHtml}
             ${tagsHtml}
+            ${imagePreviewHtml}
             <div class="task-meta">
                 <span class="task-index">#${this.stack.length - stackIndex}</span>
                 <span class="task-time">${timeString}</span>
@@ -334,6 +358,9 @@ class TODOStack {
 
         // 添加拖拽事件
         this.addDragEvents(taskDiv, stackIndex);
+
+        // 添加图片点击事件
+        this.addImageClickEvents(taskDiv, task);
 
         return taskDiv;
     }
@@ -771,6 +798,12 @@ class TODOStack {
             detailsElement.classList.add('show');
             toggleButton.classList.add('expanded');
             detailsElement.parentElement.classList.add('expanded');
+            
+            // 展开后重新绑定图片点击事件
+            const task = this.stack.find(t => t.id === taskId);
+            if (task) {
+                this.addImageClickEvents(detailsElement.parentElement, task);
+            }
         }
     }
 
@@ -803,16 +836,56 @@ class TODOStack {
 
         // 附件
         if (attachments.length > 0) {
-            html += `
-                <div class="task-attachments">
-                    ${attachments.map(attachment => `
-                        <div class="task-attachment">
-                            <i class="fas fa-paperclip"></i>
-                            ${this.escapeHtml(attachment.name)}
+            const imageAttachments = attachments.filter(att => att.isImage && att.data);
+            const otherAttachments = attachments.filter(att => !att.isImage || !att.data);
+
+            // 图片附件
+            if (imageAttachments.length > 0) {
+                html += `
+                    <div class="task-images">
+                        <div class="task-images-header">
+                            <i class="fas fa-images"></i>
+                            <span>图片附件 (${imageAttachments.length})</span>
                         </div>
-                    `).join('')}
-                </div>
-            `;
+                        <div class="task-images-grid">
+                            ${imageAttachments.map((attachment, index) => `
+                                <div class="task-image-item" data-task-id="${task.id}" data-attachment-index="${index}" data-attachment-type="detail">
+                                    <div class="task-image-preview">
+                                        <img src="${attachment.data}" alt="${this.escapeHtml(attachment.name)}" />
+                                        <div class="image-overlay">
+                                            <i class="fas fa-search-plus"></i>
+                                        </div>
+                                    </div>
+                                    <div class="task-image-name">${this.escapeHtml(attachment.name)}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 其他附件
+            if (otherAttachments.length > 0) {
+                html += `
+                    <div class="task-other-attachments">
+                        <div class="task-attachments-header">
+                            <i class="fas fa-paperclip"></i>
+                            <span>其他附件 (${otherAttachments.length})</span>
+                        </div>
+                        <div class="task-attachments">
+                            ${otherAttachments.map(attachment => {
+                                const icon = this.getFileIcon(attachment.type || '');
+                                return `
+                                    <div class="task-attachment">
+                                        <i class="fas fa-${icon}"></i>
+                                        <span class="attachment-name">${this.escapeHtml(attachment.name)}</span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
         }
 
         return html || '<p style="color: #6c757d; font-style: italic;">暂无详细信息</p>';
@@ -864,11 +937,28 @@ class TODOStack {
                 name: file.name,
                 size: file.size,
                 type: file.type,
-                data: null // 在实际应用中可以转换为base64
+                data: null,
+                isImage: file.type.startsWith('image/'),
+                preview: null
             };
 
-            this.attachments.push(attachment);
-            this.updateAttachmentsList();
+            // 如果是图片，生成预览
+            if (attachment.isImage) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    attachment.preview = e.target.result;
+                    attachment.data = e.target.result; // 保存base64数据
+                    this.updateAttachmentsList();
+                };
+                reader.readAsDataURL(file);
+            } else {
+                this.attachments.push(attachment);
+                this.updateAttachmentsList();
+            }
+
+            if (attachment.isImage) {
+                this.attachments.push(attachment);
+            }
         });
     }
 
@@ -877,14 +967,43 @@ class TODOStack {
         this.attachmentsList.innerHTML = '';
         this.attachments.forEach(attachment => {
             const attachmentDiv = document.createElement('div');
-            attachmentDiv.className = 'attachment-item';
-            attachmentDiv.innerHTML = `
-                <i class="fas fa-paperclip"></i>
-                <span>${this.escapeHtml(attachment.name)}</span>
-                <button class="remove-btn" onclick="todoStack.removeAttachment(${attachment.id})">
-                    <i class="fas fa-times"></i>
-                </button>
-            `;
+            attachmentDiv.className = `attachment-item ${attachment.isImage ? 'image-attachment' : ''}`;
+            
+            if (attachment.isImage && attachment.preview) {
+                attachmentDiv.innerHTML = `
+                    <div class="attachment-preview" data-attachment-id="${attachment.id}">
+                        <img src="${attachment.preview}" alt="${this.escapeHtml(attachment.name)}" />
+                        <div class="preview-overlay">
+                            <i class="fas fa-search-plus"></i>
+                        </div>
+                    </div>
+                    <div class="attachment-info">
+                        <span class="attachment-name">${this.escapeHtml(attachment.name)}</span>
+                        <span class="attachment-size">${this.formatFileSize(attachment.size)}</span>
+                    </div>
+                    <button class="remove-btn" onclick="todoStack.removeAttachment(${attachment.id})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                
+                // 添加图片点击事件
+                const previewElement = attachmentDiv.querySelector('.attachment-preview');
+                previewElement.addEventListener('click', () => {
+                    this.showImageModal(attachment.preview, attachment.name);
+                });
+            } else {
+                const icon = this.getFileIcon(attachment.type);
+                attachmentDiv.innerHTML = `
+                    <i class="fas fa-${icon}"></i>
+                    <div class="attachment-info">
+                        <span class="attachment-name">${this.escapeHtml(attachment.name)}</span>
+                        <span class="attachment-size">${this.formatFileSize(attachment.size)}</span>
+                    </div>
+                    <button class="remove-btn" onclick="todoStack.removeAttachment(${attachment.id})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+            }
             this.attachmentsList.appendChild(attachmentDiv);
         });
     }
@@ -1019,6 +1138,121 @@ class TODOStack {
             urgent: '紧急'
         };
         return texts[priority] || '中';
+    }
+
+    // 格式化文件大小
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // 获取文件图标
+    getFileIcon(fileType) {
+        if (fileType.startsWith('image/')) return 'image';
+        if (fileType.includes('pdf')) return 'file-pdf';
+        if (fileType.includes('word') || fileType.includes('document')) return 'file-word';
+        if (fileType.includes('excel') || fileType.includes('spreadsheet')) return 'file-excel';
+        if (fileType.includes('powerpoint') || fileType.includes('presentation')) return 'file-powerpoint';
+        if (fileType.includes('text')) return 'file-alt';
+        if (fileType.includes('zip') || fileType.includes('rar') || fileType.includes('7z')) return 'file-archive';
+        return 'file';
+    }
+
+    // 显示图片模态框
+    showImageModal(imageSrc, imageName) {
+        // 移除已存在的图片模态框
+        const existingModal = document.querySelector('.image-modal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'image-modal';
+        modal.innerHTML = `
+            <div class="image-modal-content">
+                <div class="image-modal-header">
+                    <h3>${this.escapeHtml(imageName)}</h3>
+                    <button class="image-modal-close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="image-modal-body">
+                    <img src="${imageSrc}" alt="${this.escapeHtml(imageName)}" />
+                </div>
+                <div class="image-modal-footer">
+                    <button class="download-btn" onclick="todoStack.downloadImage('${imageSrc}', '${this.escapeHtml(imageName)}')">
+                        <i class="fas fa-download"></i>
+                        下载图片
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 绑定关闭事件
+        const closeBtn = modal.querySelector('.image-modal-close');
+        closeBtn.addEventListener('click', () => {
+            modal.remove();
+            document.body.style.overflow = 'auto';
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+                document.body.style.overflow = 'auto';
+            }
+        });
+
+        document.body.style.overflow = 'hidden';
+    }
+
+    // 下载图片
+    downloadImage(imageSrc, imageName) {
+        const link = document.createElement('a');
+        link.href = imageSrc;
+        link.download = imageName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // 添加图片点击事件
+    addImageClickEvents(taskElement, task) {
+        // 为任务栈中的缩略图添加点击事件
+        const thumbElements = taskElement.querySelectorAll('[data-attachment-type="thumb"]:not([data-event-bound])');
+        thumbElements.forEach(element => {
+            element.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const attachmentIndex = parseInt(element.dataset.attachmentIndex);
+                const imageAttachments = (task.attachments || []).filter(att => att.isImage && att.data);
+                
+                if (imageAttachments[attachmentIndex]) {
+                    const attachment = imageAttachments[attachmentIndex];
+                    this.showImageModal(attachment.data, attachment.name);
+                }
+            });
+            element.setAttribute('data-event-bound', 'true');
+        });
+
+        // 为任务详情中的图片添加点击事件
+        const detailElements = taskElement.querySelectorAll('[data-attachment-type="detail"]:not([data-event-bound])');
+        detailElements.forEach(element => {
+            element.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const attachmentIndex = parseInt(element.dataset.attachmentIndex);
+                const imageAttachments = (task.attachments || []).filter(att => att.isImage && att.data);
+                
+                if (imageAttachments[attachmentIndex]) {
+                    const attachment = imageAttachments[attachmentIndex];
+                    this.showImageModal(attachment.data, attachment.name);
+                }
+            });
+            element.setAttribute('data-event-bound', 'true');
+        });
     }
 }
 
