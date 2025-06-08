@@ -150,6 +150,8 @@ class TODOStack {
             url: this.taskUrl.value.trim() || null,
             tags: this.getTagsFromInput(),
             attachments: [...this.attachments],
+            progress: 0,
+            progressHistory: [],
             timestamp: new Date(),
             index: this.stack.length
         };
@@ -813,6 +815,108 @@ class TODOStack {
         }
     }
 
+    // ===== 进展管理功能方法 =====
+
+    // 添加任务进展记录
+    addTaskProgress(taskId) {
+        const task = this.stack.find(t => t.id === taskId);
+        if (!task) {
+            this.showNotification('任务未找到', 'error');
+            return;
+        }
+
+        const inputElement = document.querySelector(`.task-progress-input[data-task-id="${taskId}"]`);
+        const progressText = inputElement ? inputElement.value.trim() : '';
+        
+        if (!progressText) {
+            this.showNotification('请输入进展内容', 'warning');
+            if (inputElement) inputElement.focus();
+            return;
+        }
+
+        // 添加进展记录
+        if (!task.progressHistory) {
+            task.progressHistory = [];
+        }
+
+        const progressEntry = {
+            id: Date.now(),
+            text: progressText,
+            timestamp: new Date()
+        };
+
+        task.progressHistory.push(progressEntry);
+
+        // 清空输入
+        if (inputElement) {
+            inputElement.value = '';
+        }
+
+        // 更新显示
+        this.refreshTaskDetails(taskId);
+        this.saveToStorage();
+        
+        this.showNotification('进展记录已添加', 'success');
+    }
+
+    // 更新任务进度
+    updateTaskProgress(taskId, progress) {
+        const task = this.stack.find(t => t.id === taskId);
+        if (!task) return;
+
+        const progressValue = Math.max(0, Math.min(100, parseInt(progress)));
+        task.progress = progressValue;
+
+        // 更新滑块旁边的百分比显示
+        const sliderValueElement = document.querySelector(`.task-progress-slider[data-task-id="${taskId}"]`)
+            ?.parentElement.querySelector('.progress-slider-value');
+        if (sliderValueElement) {
+            sliderValueElement.textContent = progressValue + '%';
+        }
+
+        // 更新进度条和百分比
+        const progressFillElement = document.querySelector(`#details-${taskId} .task-progress-fill`);
+        const progressPercentageElement = document.querySelector(`#details-${taskId} .task-progress-percentage`);
+        
+        if (progressFillElement) {
+            progressFillElement.style.width = progressValue + '%';
+        }
+        if (progressPercentageElement) {
+            progressPercentageElement.textContent = progressValue + '%';
+        }
+
+        this.saveToStorage();
+    }
+
+    // 刷新任务详情显示
+    refreshTaskDetails(taskId) {
+        const detailsElement = document.getElementById(`details-${taskId}`);
+        if (!detailsElement) return;
+
+        const task = this.stack.find(t => t.id === taskId);
+        if (!task) return;
+
+        // 重新生成详情HTML
+        detailsElement.innerHTML = this.generateTaskDetailsHtml(task);
+        
+        // 重新绑定事件
+        this.bindTaskProgressEvents(taskId);
+        this.addImageClickEvents(detailsElement.parentElement, task);
+    }
+
+    // 绑定任务进展相关事件
+    bindTaskProgressEvents(taskId) {
+        // 绑定进展输入框的回车事件
+        const progressInput = document.querySelector(`.task-progress-input[data-task-id="${taskId}"]`);
+        if (progressInput) {
+            progressInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.addTaskProgress(taskId);
+                }
+            });
+        }
+    }
+
     // ===== 新增的任务详情功能方法 =====
 
     // 切换任务详情输入区域
@@ -844,10 +948,11 @@ class TODOStack {
             toggleButton.classList.add('expanded');
             detailsElement.parentElement.classList.add('expanded');
             
-            // 展开后重新绑定图片点击事件
+            // 展开后重新绑定图片点击事件和进展管理事件
             const task = this.stack.find(t => t.id === taskId);
             if (task) {
                 this.addImageClickEvents(detailsElement.parentElement, task);
+                this.bindTaskProgressEvents(taskId);
             }
         }
     }
@@ -932,6 +1037,75 @@ class TODOStack {
                 `;
             }
         }
+
+        // 进展管理功能
+        const progress = task.progress || 0;
+        const progressHistory = task.progressHistory || [];
+        
+        html += `
+            <div class="task-progress-section">
+                <div class="task-progress-header">
+                    <h4>
+                        <i class="fas fa-chart-line"></i>
+                        任务进展
+                    </h4>
+                    <span class="task-progress-percentage">${progress}%</span>
+                </div>
+                
+                <div class="task-progress-bar-container">
+                    <div class="task-progress-bar">
+                        <div class="task-progress-fill" style="width: ${progress}%"></div>
+                    </div>
+                </div>
+                
+                <div class="task-progress-controls">
+                    <div class="progress-input-group">
+                        <input type="text" 
+                               class="task-progress-input" 
+                               placeholder="添加进展记录..." 
+                               maxlength="200"
+                               data-task-id="${task.id}">
+                        <button class="task-add-progress-btn" 
+                                onclick="todoStack.addTaskProgress(${task.id})">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="progress-slider-group">
+                        <label>进度:</label>
+                        <input type="range" 
+                               class="task-progress-slider" 
+                               min="0" max="100" 
+                               value="${progress}"
+                               data-task-id="${task.id}"
+                               onchange="todoStack.updateTaskProgress(${task.id}, this.value)">
+                        <span class="progress-slider-value">${progress}%</span>
+                    </div>
+                </div>
+                
+                <div class="task-progress-history">
+                    <h5>
+                        <i class="fas fa-history"></i>
+                        进展记录 (${progressHistory.length})
+                    </h5>
+                    <div class="task-progress-list">
+                        ${progressHistory.length === 0 ? 
+                            '<div class="no-task-progress">暂无进展记录</div>' :
+                            progressHistory
+                                .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                                .map(entry => `
+                                    <div class="task-progress-item">
+                                        <div class="task-progress-item-header">
+                                            <span class="task-progress-item-time">${this.formatTime(entry.timestamp)}</span>
+                                        </div>
+                                        <div class="task-progress-item-text">${this.escapeHtml(entry.text)}</div>
+                                    </div>
+                                `).join('')
+                        }
+                    </div>
+                </div>
+            </div>
+        `;
 
         return html || '<p style="color: #6c757d; font-style: italic;">暂无详细信息</p>';
     }
