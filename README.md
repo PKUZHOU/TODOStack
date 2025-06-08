@@ -2,6 +2,8 @@
 
 TODOStack 是一个基于栈结构的任务管理应用，它提供了一种独特的方式来组织和管理你的任务。通过栈的后进先出(LIFO)特性，帮助你专注于最新和最重要的任务。
 
+使用：Edge/chrome   扩展->打开开发者模式 ->加载解压缩的扩展-> 选择TODOSTACK文件目录
+
 ![image](https://github.com/user-attachments/assets/6012dea2-79ab-4f92-ae80-dbfb2e0b300c)
 
 ![image](https://github.com/user-attachments/assets/c139ead7-8f2e-4c80-92c7-636de5baa2ca)
