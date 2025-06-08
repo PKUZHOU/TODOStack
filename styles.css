@@ -5,12 +5,46 @@
     box-sizing: border-box;
 }
 
+/* 滚动性能优化 */
+html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* 全局硬件加速和滚动优化 */
+*,
+*::before,
+*::after {
+    -webkit-transform: translateZ(0);
+    -moz-transform: translateZ(0);
+    -ms-transform: translateZ(0);
+    -o-transform: translateZ(0);
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    -moz-backface-visibility: hidden;
+    -ms-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -webkit-perspective: 1000;
+    -moz-perspective: 1000;
+    -ms-perspective: 1000;
+    perspective: 1000;
+}
+
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background-attachment: fixed;
     min-height: 100vh;
     color: #333;
     line-height: 1.6;
+    /* 滚动优化 */
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    /* 硬件加速 */
+    will-change: scroll-position;
+    transform: translateZ(0);
 }
 
 .container {
@@ -159,6 +193,11 @@ body {
     animation: slideDown 0.3s ease-out;
     max-height: 80vh;
     overflow-y: auto;
+    /* 滚动优化 */
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    overscroll-behavior-y: contain;
+    transform: translateZ(0);
 }
 
 .details-header {
@@ -815,9 +854,42 @@ body {
     box-shadow: none !important;
 }
 
+/* 置顶操作按钮 */
+.pin-selected-btn {
+    padding: 15px 25px;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.pin-selected-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #218838 0%, #1e9e8a 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(40, 167, 69, 0.3);
+}
+
+.pin-selected-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+    transform: none;
+    box-shadow: none;
+}
+
 /* 栈容器 */
 .stack-container {
     margin-bottom: 30px;
+    /* 为选中标识和动画留出空间 */
+    padding-top: 15px;
 }
 
 .stack-header {
@@ -849,6 +921,8 @@ body {
     padding: 20px;
     background: #f8f9fa;
     position: relative;
+    /* 允许动画超出边界 */
+    overflow: visible;
 }
 
 .task-stack {
@@ -856,6 +930,42 @@ body {
     flex-direction: column;
     gap: 10px;
     min-height: 160px;
+    max-height: 600px;
+    overflow-y: auto;
+    overflow-x: visible; /* 允许水平方向超出，用于动画 */
+    padding-right: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: #667eea #f1f3f4;
+    /* 滚动性能优化 */
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    /* 硬件加速 */
+    will-change: scroll-position, transform;
+    transform: translateZ(0);
+    /* 滚动捕捉 */
+    scroll-snap-type: y proximity;
+    /* 防止重绘 */
+    contain: layout style paint;
+}
+
+.task-stack::-webkit-scrollbar {
+    width: 8px;
+}
+
+.task-stack::-webkit-scrollbar-track {
+    background: #f1f3f4;
+    border-radius: 10px;
+}
+
+.task-stack::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.task-stack::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
 }
 
 .task-item {
@@ -869,6 +979,11 @@ body {
     transition: all 0.3s ease;
     position: relative;
     cursor: pointer;
+    /* 滚动和性能优化 */
+    scroll-snap-align: start;
+    will-change: transform;
+    transform: translateZ(0);
+    contain: layout style paint;
 }
 
 .task-item:hover {
@@ -883,23 +998,54 @@ body {
     box-shadow: 0 6px 12px rgba(102, 126, 234, 0.2);
 }
 
-.task-item:first-child::before {
-    content: "栈顶";
-    position: absolute;
-    top: -10px;
-    right: 15px;
-    background: #667eea;
-    color: white;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 600;
-}
+/* 移除栈顶标识 */
 
 .task-item.expanded {
     background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
     border-color: #667eea;
     box-shadow: 0 8px 24px rgba(102, 126, 234, 0.15);
+}
+
+/* 任务选中状态 */
+.task-item.selected {
+    border-color: #28a745;
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    box-shadow: 0 8px 24px rgba(40, 167, 69, 0.2);
+    transform: translateY(-2px);
+    position: relative;
+    z-index: 10;
+}
+
+/* 选中状态背景遮罩 */
+.task-item.selected::after {
+    content: "";
+    position: absolute;
+    bottom: 5px;
+    left: 5px;
+    width: 85px;
+    height: 26px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 20px;
+    z-index: 24;
+    backdrop-filter: blur(2px);
+}
+
+.task-item.selected::before {
+    content: "✓ 已选中";
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    background: #28a745;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 11px;
+    font-weight: 600;
+    z-index: 25;
+    box-shadow: 0 2px 12px rgba(40, 167, 69, 0.4);
+    white-space: nowrap;
+    border: 2px solid white;
+    animation: selectedBadgeShow 0.3s ease-out;
 }
 
 .task-header {
@@ -1436,6 +1582,8 @@ body {
 .expand-toggle.expanded {
     transform: rotate(180deg);
 }
+
+/* 移除置顶按钮样式 */
 
 @keyframes pulse {
     0%, 100% { opacity: 1; }
@@ -1976,6 +2124,12 @@ body {
     scrollbar-width: thin;
     scrollbar-color: #667eea #f1f1f1;
     scroll-behavior: smooth;
+    /* 滚动优化 */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    transform: translateZ(0);
+    will-change: scroll-position;
+    contain: layout style paint;
 }
 
 /* 自定义滚动条样式 (Webkit浏览器) */
@@ -2326,4 +2480,82 @@ body {
         transform: scale(1.02);
         box-shadow: 0 0 30px rgba(0, 123, 255, 0.5);
     }
-} 
+}
+
+/* 选中标识显示动画 */
+@keyframes selectedBadgeShow {
+    0% {
+        opacity: 0;
+        transform: scale(0.5) translateY(-10px);
+    }
+    60% {
+        opacity: 1;
+        transform: scale(1.1);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* 额外的滚动性能优化 */
+/* 强制硬件加速所有可滚动元素 */
+.task-stack,
+.task-details-section,
+.modal-body,
+.history-list {
+    /* GPU加速 */
+    -webkit-transform: translate3d(0, 0, 0);
+    -moz-transform: translate3d(0, 0, 0);
+    -ms-transform: translate3d(0, 0, 0);
+    -o-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+    
+    /* 优化滚动性能 */
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -webkit-perspective: 1000;
+    perspective: 1000;
+    
+    /* 防止滚动时的重绘 */
+    contain: layout style paint;
+    isolation: isolate;
+}
+
+/* 优化动画性能 */
+.task-item,
+.task-item *,
+.expand-toggle,
+.pin-to-top-btn,
+.history-item {
+    /* 启用硬件加速 */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    
+    /* 优化动画合成 */
+    will-change: auto;
+}
+
+/* 滚动时暂停动画以提高性能 */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* 针对高DPI显示器的优化 */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .task-stack,
+    .task-item {
+        /* 在高DPI显示器上使用更精细的渲染 */
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+    }
+}

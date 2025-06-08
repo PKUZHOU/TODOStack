@@ -3,9 +3,11 @@ class TODOStack {
         this.stack = [];
         this.completedTasks = [];
         this.todayTaskCount = 0;
+        this.selectedTaskId = null; // 当前选中的任务ID
         this.init();
         this.loadFromStorage();
         this.updateUI();
+        this.handleUrlParameters();
     }
 
     init() {
@@ -14,6 +16,7 @@ class TODOStack {
         this.pushBtn = document.getElementById('pushBtn');
         this.popBtn = document.getElementById('popBtn');
         this.peekBtn = document.getElementById('peekBtn');
+        this.pinSelectedBtn = document.getElementById('pinSelectedBtn');
         this.clearBtn = document.getElementById('clearBtn');
         this.taskStack = document.getElementById('taskStack');
         this.stackSize = document.getElementById('stackSize');
@@ -70,6 +73,7 @@ class TODOStack {
         // 栈操作事件
         this.popBtn.addEventListener('click', () => this.pop());
         this.peekBtn.addEventListener('click', () => this.peek());
+        this.pinSelectedBtn.addEventListener('click', () => this.pinSelectedTask());
         this.clearBtn.addEventListener('click', () => this.clear());
 
         // 历史记录事件
@@ -122,6 +126,41 @@ class TODOStack {
                         this.toggleDetails();
                         break;
                 }
+            }
+        });
+
+        // 事件委托 - 处理动态生成的按钮
+        document.addEventListener('click', (e) => {
+            const target = e.target.closest('[data-action]');
+            if (!target) return;
+
+            const action = target.dataset.action;
+            const taskId = target.dataset.taskId;
+
+            switch(action) {
+                case 'toggle-details':
+                    this.toggleTaskDetails(parseInt(taskId));
+                    break;
+                case 'undo-complete':
+                    this.undoComplete(taskId);
+                    break;
+                case 'remove-attachment':
+                    const attachmentId = target.dataset.attachmentId;
+                    this.removeAttachment(parseInt(attachmentId));
+                    break;
+                case 'remove-tag':
+                    const tagToRemove = target.dataset.tag;
+                    this.removeTagFromDisplay(tagToRemove);
+                    break;
+            }
+        });
+
+        // 任务选择事件
+        document.addEventListener('click', (e) => {
+            const taskItem = e.target.closest('.task-item');
+            if (taskItem && !e.target.closest('[data-action]') && !e.target.closest('.expand-toggle')) {
+                const taskId = parseInt(taskItem.dataset.taskId);
+                this.selectTask(taskId);
             }
         });
     }
@@ -374,7 +413,7 @@ class TODOStack {
                     ${this.generateTaskStats(task)}
                 </div>
             </div>
-            <button class="expand-toggle" onclick="todoStack.toggleTaskDetails(${task.id})">
+            <button class="expand-toggle" data-task-id="${task.id}" data-action="toggle-details">
                 <i class="fas fa-chevron-down"></i>
             </button>
             <div class="task-details" id="details-${task.id}">
@@ -397,6 +436,11 @@ class TODOStack {
         this.popBtn.disabled = !hasItems;
         this.peekBtn.disabled = !hasItems;
         this.clearBtn.disabled = !hasItems;
+        
+        // 更新置顶按钮状态
+        const hasSelectedTask = this.selectedTaskId !== null;
+        const selectedTaskNotOnTop = hasSelectedTask && this.getSelectedTaskIndex() > 0;
+        this.pinSelectedBtn.disabled = !selectedTaskNotOnTop;
         
         // 更新历史记录按钮状态
         this.clearHistoryBtn.disabled = this.completedTasks.length === 0;
@@ -830,7 +874,7 @@ class TODOStack {
                 </div>
             </div>
             <div class="history-actions">
-                <button class="history-undo-btn" onclick="todoStack.undoComplete('${task.id}')" title="撤销完成">
+                <button class="history-undo-btn" data-task-id="${task.id}" data-action="undo-complete" title="撤销完成">
                     <i class="fas fa-undo"></i>
                 </button>
             </div>
@@ -1211,16 +1255,36 @@ class TODOStack {
 
     // 解析Markdown
     parseMarkdown(text) {
-        if (typeof marked !== 'undefined') {
-            return marked.parse(text);
-        } else {
-            // 简单的Markdown解析
-            return text
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/`(.*?)`/g, '<code>$1</code>')
-                .replace(/\n/g, '<br>');
-        }
+        if (!text) return '';
+        
+        // 简单的Markdown解析实现
+        let html = text
+            // 转义HTML特殊字符
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            // 标题
+            .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+            .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+            .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+            // 粗体和斜体
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            // 代码
+            .replace(/`(.*?)`/g, '<code>$1</code>')
+            // 链接
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+            // 无序列表
+            .replace(/^\s*[-*+]\s+(.*)$/gim, '<li>$1</li>')
+            // 有序列表
+            .replace(/^\s*\d+\.\s+(.*)$/gim, '<li>$1</li>')
+            // 换行
+            .replace(/\n/g, '<br>');
+        
+        // 包装列表项
+        html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+        
+        return html;
     }
 
     // 显示Markdown预览
@@ -1299,7 +1363,7 @@ class TODOStack {
                         <span class="attachment-name">${this.escapeHtml(attachment.name)}</span>
                         <span class="attachment-size">${this.formatFileSize(attachment.size)}</span>
                     </div>
-                    <button class="remove-btn" onclick="todoStack.removeAttachment(${attachment.id})">
+                    <button class="remove-btn" data-action="remove-attachment" data-attachment-id="${attachment.id}">
                         <i class="fas fa-times"></i>
                     </button>
                 `;
@@ -1317,7 +1381,7 @@ class TODOStack {
                         <span class="attachment-name">${this.escapeHtml(attachment.name)}</span>
                         <span class="attachment-size">${this.formatFileSize(attachment.size)}</span>
                     </div>
-                    <button class="remove-btn" onclick="todoStack.removeAttachment(${attachment.id})">
+                    <button class="remove-btn" data-action="remove-attachment" data-attachment-id="${attachment.id}">
                         <i class="fas fa-times"></i>
                     </button>
                 `;
@@ -1362,7 +1426,7 @@ class TODOStack {
             tagDiv.className = 'tag-item';
             tagDiv.innerHTML = `
                 <span>${this.escapeHtml(tag)}</span>
-                <button class="remove-tag" onclick="todoStack.removeTagFromDisplay('${tag}')">
+                <button class="remove-tag" data-action="remove-tag" data-tag="${this.escapeHtml(tag)}">
                     <i class="fas fa-times"></i>
                 </button>
             `;
@@ -1641,6 +1705,149 @@ class TODOStack {
         }
         
         return stats.join('');
+    }
+
+    // 选择任务
+    selectTask(taskId) {
+        // 清除之前的选中状态
+        if (this.selectedTaskId !== null) {
+            const prevSelected = document.querySelector(`[data-task-id="${this.selectedTaskId}"]`);
+            if (prevSelected) {
+                prevSelected.classList.remove('selected');
+            }
+        }
+
+        // 设置新的选中状态
+        if (this.selectedTaskId === taskId) {
+            // 如果点击的是已选中的任务，取消选中
+            this.selectedTaskId = null;
+        } else {
+            this.selectedTaskId = taskId;
+            const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+            if (taskElement) {
+                taskElement.classList.add('selected');
+            }
+        }
+
+        this.updateButtons();
+    }
+
+    // 获取选中任务在栈中的索引
+    getSelectedTaskIndex() {
+        if (this.selectedTaskId === null) return -1;
+        return this.stack.findIndex(task => task.id === this.selectedTaskId);
+    }
+
+    // 置顶选中的任务
+    pinSelectedTask() {
+        if (this.selectedTaskId === null) {
+            this.showNotification('请先选择要置顶的任务', 'warning');
+            return;
+        }
+
+        const taskIndex = this.getSelectedTaskIndex();
+        if (taskIndex === -1) {
+            this.showNotification('选中的任务未找到', 'error');
+            this.selectedTaskId = null;
+            this.updateButtons();
+            return;
+        }
+
+        if (taskIndex === this.stack.length - 1) {
+            this.showNotification('该任务已在栈顶', 'warning');
+            return;
+        }
+
+        // 移除任务并置顶
+        const [task] = this.stack.splice(taskIndex, 1);
+        this.stack.push(task);
+
+        // 清除选中状态
+        this.selectedTaskId = null;
+
+        this.updateUI();
+        this.saveToStorage();
+        this.showNotification(`任务"${task.title || task.content || '未命名任务'}"已置顶`, 'success');
+        
+        // 置顶动画已移除 - 用户要求取消
+    }
+
+    // 置顶任务（保留原方法以兼容）
+    pinToTop(taskId) {
+        // 找到任务在栈中的位置
+        const taskIndex = this.stack.findIndex(task => task.id === taskId);
+        if (taskIndex === -1) {
+            this.showNotification('任务不存在', 'error');
+            return;
+        }
+
+        // 如果已经是栈顶，不需要操作
+        if (taskIndex === this.stack.length - 1) {
+            this.showNotification('任务已经在栈顶', 'info');
+            return;
+        }
+
+        // 移动任务到栈顶
+        const task = this.stack.splice(taskIndex, 1)[0];
+        this.stack.push(task);
+
+        // 更新UI和保存数据
+        this.updateUI();
+        this.saveToStorage();
+        
+        this.showNotification(`任务 "${task.title}" 已置顶`, 'success');
+
+        // 置顶动画已移除 - 用户要求取消
+    }
+
+    // 处理URL参数
+    handleUrlParameters() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const taskId = urlParams.get('taskId');
+        const action = urlParams.get('action');
+
+        if (taskId && action === 'viewDetail') {
+            // 延迟执行，确保UI已经渲染完成
+            setTimeout(() => {
+                this.openTaskDetailFromUrl(parseInt(taskId));
+            }, 500);
+        }
+    }
+
+    // 从URL打开任务详情
+    openTaskDetailFromUrl(taskId) {
+        // 查找任务
+        const task = this.stack.find(t => t.id === taskId);
+        if (!task) {
+            this.showNotification('未找到指定的任务', 'warning');
+            return;
+        }
+
+        // 滚动到任务位置
+        const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+        if (taskElement) {
+            taskElement.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'center' 
+            });
+            
+            // 高亮任务
+            taskElement.classList.add('highlight-task');
+            setTimeout(() => {
+                taskElement.classList.remove('highlight-task');
+            }, 3000);
+        }
+
+        // 展开任务详情
+        this.toggleTaskDetails(taskId);
+        
+        this.showNotification(`已定位到任务: "${task.title}"`, 'success');
+        
+        // 清除URL参数，避免刷新页面时重复执行
+        const url = new URL(window.location);
+        url.searchParams.delete('taskId');
+        url.searchParams.delete('action');
+        window.history.replaceState({}, document.title, url.pathname);
     }
 }
 

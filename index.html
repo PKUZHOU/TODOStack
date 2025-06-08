@@ -7,8 +7,7 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <!-- Markdown 解析库 -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- 移除外部CDN脚本，改为本地实现 -->
 </head>
 <body>
     <div class="container">
@@ -139,6 +138,10 @@
                 <button id="peekBtn" class="peek-btn" disabled>
                     <i class="fas fa-search-plus"></i>
                     查看栈顶详情 (Peek)
+                </button>
+                <button id="pinSelectedBtn" class="pin-selected-btn" disabled>
+                    <i class="fas fa-arrow-up"></i>
+                    置顶选中任务
                 </button>
                 <button id="clearBtn" class="clear-btn" disabled>
                     <i class="fas fa-trash"></i>
