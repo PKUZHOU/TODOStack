@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TODOStack - 基于栈的任务管理</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="title">
+                <i class="fas fa-layer-group"></i>
+                TODOStack
+            </h1>
+            <p class="subtitle">基于栈数据结构的任务管理系统</p>
+        </header>
+
+        <div class="main-content">
+            <!-- 添加任务区域 -->
+            <div class="add-task-section">
+                <div class="input-container">
+                    <input 
+                        type="text" 
+                        id="taskInput" 
+                        placeholder="输入新任务..." 
+                        maxlength="100"
+                    >
+                    <button id="pushBtn" class="push-btn">
+                        <i class="fas fa-plus"></i>
+                        入栈 (Push)
+                    </button>
+                </div>
+                <div class="stack-info">
+                    <span class="stack-size">栈大小: <span id="stackSize">0</span></span>
+                    <span class="operation-hint">提示: 按 Enter 键快速添加任务</span>
+                </div>
+            </div>
+
+            <!-- 栈操作区域 -->
+            <div class="stack-operations">
+                <button id="popBtn" class="pop-btn" disabled>
+                    <i class="fas fa-check"></i>
+                    完成栈顶任务 (Pop)
+                </button>
+                <button id="peekBtn" class="peek-btn" disabled>
+                    <i class="fas fa-eye"></i>
+                    查看栈顶 (Peek)
+                </button>
+                <button id="clearBtn" class="clear-btn" disabled>
+                    <i class="fas fa-trash"></i>
+                    清空栈
+                </button>
+            </div>
+
+            <!-- 栈可视化区域 -->
+            <div class="stack-container">
+                <div class="stack-header">
+                    <h3>任务栈可视化</h3>
+                    <div class="stack-pointer">
+                        <i class="fas fa-arrow-down"></i>
+                        <span>栈顶 (Top)</span>
+                    </div>
+                </div>
+                
+                <div class="stack-wrapper">
+                    <div id="taskStack" class="task-stack">
+                        <!-- 任务项将动态添加到这里 -->
+                        <div class="empty-stack">
+                            <i class="fas fa-inbox"></i>
+                            <p>栈为空</p>
+                            <p class="hint">添加你的第一个任务开始使用！</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stack-footer">
+                    <span>栈底 (Bottom)</span>
+                    <i class="fas fa-arrow-up"></i>
+                </div>
+            </div>
+
+            <!-- 历史任务记录 -->
+            <div class="history-section">
+                <div class="history-header">
+                    <h3>
+                        <i class="fas fa-history"></i>
+                        已完成任务历史
+                    </h3>
+                    <div class="history-controls">
+                        <button id="toggleHistory" class="toggle-history-btn">
+                            <i class="fas fa-eye"></i>
+                            显示历史
+                        </button>
+                        <button id="clearHistory" class="clear-history-btn" disabled>
+                            <i class="fas fa-trash-alt"></i>
+                            清空历史
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="historyContainer" class="history-container" style="display: none;">
+                    <div id="historyList" class="history-list">
+                        <!-- 历史任务将显示在这里 -->
+                        <div class="empty-history">
+                            <i class="fas fa-clipboard-check"></i>
+                            <p>暂无已完成任务</p>
+                            <p class="hint">完成的任务会出现在这里</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 统计信息 -->
+            <div class="stats-section">
+                <div class="stat-card">
+                    <i class="fas fa-tasks"></i>
+                    <div class="stat-info">
+                        <span class="stat-value" id="totalTasks">0</span>
+                        <span class="stat-label">待完成任务</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-check-circle"></i>
+                    <div class="stat-info">
+                        <span class="stat-value" id="completedTasks">0</span>
+                        <span class="stat-label">已完成任务</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-clock"></i>
+                    <div class="stat-info">
+                        <span class="stat-value" id="todayTasks">0</span>
+                        <span class="stat-label">今日添加</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 帮助提示 -->
+        <div class="help-section">
+            <button id="helpBtn" class="help-btn">
+                <i class="fas fa-question-circle"></i>
+                如何使用 TODOStack？
+            </button>
+        </div>
+
+        <!-- 帮助模态框 -->
+        <div id="helpModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>TODOStack 使用指南</h3>
+                    <button class="close-btn" id="closeModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="help-item">
+                        <i class="fas fa-plus"></i>
+                        <div>
+                            <h4>入栈 (Push)</h4>
+                            <p>添加新任务到栈顶。最新添加的任务会显示在最上方。</p>
+                        </div>
+                    </div>
+                    <div class="help-item">
+                        <i class="fas fa-check"></i>
+                        <div>
+                            <h4>出栈 (Pop)</h4>
+                            <p>完成并移除栈顶任务。遵循 LIFO (后进先出) 原则。</p>
+                        </div>
+                    </div>
+                    <div class="help-item">
+                        <i class="fas fa-eye"></i>
+                        <div>
+                            <h4>查看栈顶 (Peek)</h4>
+                            <p>查看当前栈顶任务，但不移除它。</p>
+                        </div>
+                    </div>
+                    <div class="help-item">
+                        <i class="fas fa-lightbulb"></i>
+                        <div>
+                            <h4>使用技巧</h4>
+                            <p>专注于栈顶任务，这通常是最新、最重要的任务。按 Enter 键快速添加任务。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 

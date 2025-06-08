@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>创建 TODOStack 图标</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .preview { margin: 20px 0; }
+        canvas { border: 1px solid #ccc; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>TODOStack 图标生成器</h1>
+    <button onclick="generateAllIcons()">生成并下载所有图标</button>
+    
+    <div class="preview" id="preview"></div>
+    
+    <script>
+        function createIcon(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // 背景圆形
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#667eea');
+            gradient.addColorStop(1, '#764ba2');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(size/2, size/2, size/2 - 1, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // 栈的层级
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            const layerHeight = Math.max(2, size * 0.1);
+            const spacing = Math.max(2, size * 0.15);
+            
+            for (let i = 0; i < 3; i++) {
+                const y = size * 0.75 - i * spacing;
+                const width = size * 0.7 - i * (size * 0.08);
+                const x = (size - width) / 2;
+                ctx.fillRect(x, y, width, layerHeight);
+            }
+            
+            // TOP 标识
+            if (size >= 24) {
+                ctx.fillStyle = '#ffd700';
+                ctx.font = `bold ${Math.max(6, size * 0.1)}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.fillText('T', size/2, size * 0.3);
+            }
+            
+            return canvas;
+        }
+        
+        function downloadCanvas(canvas, filename) {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+        
+        function generateAllIcons() {
+            const sizes = [16, 32, 48, 128];
+            const preview = document.getElementById('preview');
+            preview.innerHTML = '';
+            
+            sizes.forEach(size => {
+                const canvas = createIcon(size);
+                preview.appendChild(canvas);
+                
+                // 自动下载
+                setTimeout(() => {
+                    downloadCanvas(canvas, `icon${size}.png`);
+                }, 100 * size);
+            });
+            
+            alert('图标生成完成！请将下载的文件放入 icons 文件夹。');
+        }
+    </script>
+</body>
+</html> 
