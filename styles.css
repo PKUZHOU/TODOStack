@@ -1387,26 +1387,108 @@ body {
     line-height: 1.6;
 }
 
-.task-description h1, .task-description h2, .task-description h3 {
-    margin-top: 0;
+.description-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 10px;
+}
+
+.description-header h4 {
+    margin: 0;
+    color: #495057;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.description-header h4 i {
+    color: #667eea;
+}
+
+.edit-description-btn {
+    background: none;
+    border: none;
+    color: #667eea;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease;
+}
+
+.edit-description-btn:hover {
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.description-content {
+    background: white;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.description-edit {
+    margin-top: 10px;
+}
+
+.description-textarea {
+    width: 100%;
+    min-height: 150px;
+    padding: 12px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 14px;
+    line-height: 1.6;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.description-textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.description-edit-controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.save-description-btn,
+.cancel-description-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease;
+}
+
+.save-description-btn {
+    background: #667eea;
+    color: white;
+}
+
+.save-description-btn:hover {
+    background: #5a67d8;
+}
+
+.cancel-description-btn {
+    background: #e9ecef;
     color: #495057;
 }
 
-.task-description ul, .task-description ol {
-    margin-left: 20px;
-    margin-bottom: 10px;
-}
-
-.task-description p {
-    margin-bottom: 10px;
-}
-
-.task-description code {
-    background: #e9ecef;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-family: 'Courier New', monospace;
+.cancel-description-btn:hover {
+    background: #dee2e6;
 }
 
 .task-attachments {

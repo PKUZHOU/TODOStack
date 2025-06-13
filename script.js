@@ -155,10 +155,52 @@ class TODOStack {
             }
         });
 
+        // 事件委托 - 处理描述编辑相关按钮
+        document.addEventListener('click', (e) => {
+            // 处理编辑按钮
+            if (e.target.closest('.edit-description-btn')) {
+                e.stopPropagation();
+                const btn = e.target.closest('.edit-description-btn');
+                const taskId = parseInt(btn.dataset.taskId);
+                this.showDescriptionEdit(taskId);
+                return;
+            }
+
+            // 处理保存按钮
+            if (e.target.closest('.save-description-btn')) {
+                e.stopPropagation();
+                const btn = e.target.closest('.save-description-btn');
+                const taskId = parseInt(btn.dataset.taskId);
+                this.saveDescriptionEdit(taskId);
+                return;
+            }
+
+            // 处理取消按钮
+            if (e.target.closest('.cancel-description-btn')) {
+                e.stopPropagation();
+                const btn = e.target.closest('.cancel-description-btn');
+                const taskId = parseInt(btn.dataset.taskId);
+                this.cancelDescriptionEdit(taskId);
+                return;
+            }
+
+            // 处理文本框点击
+            if (e.target.closest('.description-textarea')) {
+                e.stopPropagation();
+                return;
+            }
+        });
+
         // 任务选择事件
         document.addEventListener('click', (e) => {
             const taskItem = e.target.closest('.task-item');
-            if (taskItem && !e.target.closest('[data-action]') && !e.target.closest('.expand-toggle')) {
+            if (taskItem && 
+                !e.target.closest('[data-action]') && 
+                !e.target.closest('.expand-toggle') &&
+                !e.target.closest('.edit-description-btn') &&
+                !e.target.closest('.save-description-btn') &&
+                !e.target.closest('.cancel-description-btn') &&
+                !e.target.closest('.description-textarea')) {
                 const taskId = parseInt(taskItem.dataset.taskId);
                 this.selectTask(taskId);
             }
@@ -1133,7 +1175,26 @@ class TODOStack {
         if (description) {
             html += `
                 <div class="task-description">
-                    ${this.parseMarkdown(description)}
+                    <div class="description-header">
+                        <h4><i class="fas fa-align-left"></i> 任务描述</h4>
+                        <button class="edit-description-btn" data-task-id="${task.id}">
+                            <i class="fas fa-edit"></i> 编辑
+                        </button>
+                    </div>
+                    <div class="description-content" id="description-content-${task.id}">
+                        ${this.parseMarkdown(description)}
+                    </div>
+                    <div class="description-edit" id="description-edit-${task.id}" style="display: none;">
+                        <textarea class="description-textarea" id="description-textarea-${task.id}">${this.escapeHtml(description)}</textarea>
+                        <div class="description-edit-controls">
+                            <button class="save-description-btn" data-task-id="${task.id}">
+                                <i class="fas fa-save"></i> 保存
+                            </button>
+                            <button class="cancel-description-btn" data-task-id="${task.id}">
+                                <i class="fas fa-times"></i> 取消
+                            </button>
+                        </div>
+                    </div>
                 </div>
             `;
         }
@@ -1866,6 +1927,62 @@ class TODOStack {
         url.searchParams.delete('taskId');
         url.searchParams.delete('action');
         window.history.replaceState({}, document.title, url.pathname);
+    }
+
+
+
+    // 显示描述编辑界面
+    showDescriptionEdit(taskId) {
+        const contentElement = document.getElementById(`description-content-${taskId}`);
+        const editElement = document.getElementById(`description-edit-${taskId}`);
+        
+        if (contentElement && editElement) {
+            contentElement.style.display = 'none';
+            editElement.style.display = 'block';
+            
+            // 自动聚焦到文本框
+            const textarea = document.getElementById(`description-textarea-${taskId}`);
+            if (textarea) {
+                textarea.focus();
+            }
+        }
+    }
+
+    // 保存描述编辑
+    saveDescriptionEdit(taskId) {
+        const task = this.stack.find(t => t.id === taskId);
+        if (!task) return;
+
+        const textarea = document.getElementById(`description-textarea-${taskId}`);
+        if (!textarea) return;
+
+        const newDescription = textarea.value.trim();
+        task.description = newDescription;
+
+        // 更新显示
+        const contentElement = document.getElementById(`description-content-${taskId}`);
+        const editElement = document.getElementById(`description-edit-${taskId}`);
+        
+        if (contentElement && editElement) {
+            contentElement.innerHTML = this.parseMarkdown(newDescription);
+            contentElement.style.display = 'block';
+            editElement.style.display = 'none';
+        }
+
+        // 保存到存储
+        this.saveToStorage();
+        this.showNotification('任务描述已更新', 'success');
+    }
+
+    // 取消描述编辑
+    cancelDescriptionEdit(taskId) {
+        const contentElement = document.getElementById(`description-content-${taskId}`);
+        const editElement = document.getElementById(`description-edit-${taskId}`);
+        
+        if (contentElement && editElement) {
+            contentElement.style.display = 'block';
+            editElement.style.display = 'none';
+        }
     }
 }
 
